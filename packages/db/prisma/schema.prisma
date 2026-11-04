@@ -1,0 +1,244 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Result of one standing-goal check (plain code). Used to compute "hours broken".
+model GoalCheck {
+  id         String   @id @default(cuid())
+  goalId     String
+  status     String // green | amber | red
+  summary    String
+  evidence   Json
+  ref        String   @default("main")
+  durationMs Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([goalId, createdAt])
+  @@index([createdAt])
+}
+
+model Job {
+  id                String    @id
+  goalId            String
+  jobType           String
+  status            String // queued | running | verifying | gating | awaiting_approval | changes_requested | merged | rejected | gate_failed | failed | budget_exceeded | killed
+  attempt           Int       @default(1)
+  branch            String
+  degraded          Boolean   @default(false)
+  workerModel       String?
+  verifierModel     String?
+  provider          String?
+  trustLevelAtStart Int       @default(0)
+  diff              String?   @db.Text
+  explanation       String?   @db.Text
+  evidence          Json?
+  baseline          Json?
+  analysis          Json?
+  feedback          String?   @db.Text
+  error             String?   @db.Text
+  stepsUsed         Int       @default(0)
+  tokensIn          Int       @default(0)
+  tokensOut         Int       @default(0)
+  costUsd           Float     @default(0)
+  prUrl             String?
+  mergedSha         String?
+  source            String    @default("conductor")
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  contract        Contract?
+  steps           JobStep[]
+  verifierReports VerifierReport[]
+  gateResults     GateResult[]
+  approvals       ApprovalDecision[]
+
+  @@index([status])
+  @@index([goalId, status])
+  @@index([jobType, createdAt])
+  @@index([createdAt])
+}
+
+/// The job contract (validated by zod in packages/core/src/contract.ts).
+model Contract {
+  id             String   @id @default(cuid())
+  jobId          String   @unique
+  job            Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  goalId         String
+  jobType        String
+  difficulty     String
+  allowedPaths   String[]
+  forbiddenPaths String[]
+  maxSteps       Int
+  maxTokens      Int
+  maxUsd         Float
+  maxMinutes     Float
+  doneCriteria   Json
+  riskLevel      String
+  allowRegistry  Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+/// One step of a job trace; also the crash-safety checkpoint.
+model JobStep {
+  id            String   @id @default(cuid())
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attempt       Int      @default(1)
+  index         Int
+  phase         String // worker | classifier | verifier | gate | approval | lesson | system
+  kind          String // llm | tool | note
+  tool          String?
+  status        String   @default("ok") // ok | denied | error
+  inputSummary  String?  @db.Text
+  outputSummary String?  @db.Text
+  model         String?
+  provider      String?
+  tokensIn      Int      @default(0)
+  tokensOut     Int      @default(0)
+  costUsd       Float    @default(0)
+  durationMs    Int      @default(0)
+  checkpoint    Json?
+  createdAt     DateTime @default(now())
+
+  @@index([jobId, attempt, index])
+  @@index([createdAt])
+}
+
+model VerifierReport {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attempt   Int      @default(1)
+  model     String
+  provider  String
+  verdict   String // pass | fail
+  checks    Json
+  concerns  Json
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+}
+
+model GateResult {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attempt   Int      @default(1)
+  name      String
+  passed    Boolean
+  evidence  String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([jobId, attempt])
+}
+
+model ApprovalDecision {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  attempt   Int      @default(1)
+  decision  String // approve | reject | request_changes
+  reason    String?  @db.Text
+  actor     String   @default("human")
+  createdAt DateTime @default(now())
+
+  @@index([jobId])
+}
+
+model TrustRecord {
+  jobType           String    @id
+  level             Int       @default(0)
+  consecutivePasses Int       @default(0)
+  totalRuns         Int       @default(0)
+  approvals         Int       @default(0)
+  rejections        Int       @default(0)
+  gateFailures      Int       @default(0)
+  lastFailureAt     DateTime?
+  lastFailureReason String?
+  autoMergeAllowed  Boolean   @default(false)
+  updatedAt         DateTime  @updatedAt
+}
+
+model TrustEvent {
+  id        String   @id @default(cuid())
+  jobType   String
+  jobId     String?
+  kind      String // run | approved | rejected | gate_failed | promoted | demoted
+  fromLevel Int
+  toLevel   Int
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([jobType, createdAt])
+}
+
+model Lesson {
+  id         String   @id @default(cuid())
+  jobId      String?
+  jobType    String
+  goalId     String
+  result     String // pass | fail
+  confidence Float
+  evidence   String
+  lesson     String
+  nextTime   String
+  hash       String   @unique
+  createdAt  DateTime @default(now())
+
+  @@index([jobType, createdAt])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  actor     String // goal_checker | conductor | worker | verifier | gate | human | policy | system
+  action    String
+  target    String
+  severity  String   @default("info") // info | warn | denied
+  jobId     String?
+  details   Json
+
+  @@index([createdAt])
+  @@index([actor, createdAt])
+  @@index([action])
+  @@index([jobId])
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model MlModel {
+  id           String   @id @default(cuid())
+  name         String
+  version      Int
+  featureNames Json
+  weights      Json
+  metrics      Json
+  active       Boolean  @default(true)
+  trainedAt    DateTime @default(now())
+
+  @@index([name, active])
+}
+
+model MlPrediction {
+  id          String   @id @default(cuid())
+  modelId     String?
+  jobId       String?
+  testName    String
+  features    Json
+  probability Float
+  decision    String // flaky | real_bug | uncertain
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}

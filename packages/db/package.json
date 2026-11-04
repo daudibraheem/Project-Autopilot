@@ -6,19 +6,19 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "generate": "prisma generate",
-    "migrate:dev": "prisma migrate dev",
-    "migrate:deploy": "prisma migrate deploy",
-    "migrate:reset": "prisma migrate reset --force --skip-seed",
-    "seed": "tsx src/seed.ts",
+    "prisma": "node --env-file-if-exists=../../.env node_modules/prisma/build/index.js",
+    "generate": "pnpm prisma generate",
+    "migrate:dev": "pnpm prisma migrate dev",
+    "migrate:deploy": "pnpm prisma migrate deploy",
+    "migrate:reset": "pnpm prisma migrate reset --force --skip-seed",
+    "seed": "node --env-file-if-exists=../../.env --import tsx src/seed.ts",
     "typecheck": "tsc --noEmit -p ."
   },
-  "prisma": { "seed": "tsx src/seed.ts" },
   "dependencies": {
-    "@prisma/client": "6.19.3",
-    "dotenv": "16.6.1"
+    "@prisma/client": "6.19.3"
   },
   "devDependencies": {
-    "prisma": "6.19.3"
+    "prisma": "6.19.3",
+    "tsx": "4.23.15"
   }
 }

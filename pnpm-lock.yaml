@@ -212,13 +212,13 @@ importers:
       '@prisma/client':
         specifier: 6.19.3
         version: 6.19.3(prisma@6.19.3(typescript@5.9.3))(typescript@5.9.3)
-      dotenv:
-        specifier: 16.6.1
-        version: 16.6.1
     devDependencies:
       prisma:
         specifier: 6.19.3
         version: 6.19.3(typescript@5.9.3)
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
 
 packages:
 
