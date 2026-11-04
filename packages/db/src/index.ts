@@ -1,4 +1,25 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
+
+// Load the monorepo root .env (does not override variables already set).
+(() => {
+  let dir = process.cwd();
+  for (let i = 0; i < 6; i++) {
+    if (existsSync(path.join(dir, "pnpm-workspace.yaml"))) {
+      const envFile = path.join(dir, ".env");
+      if (existsSync(envFile)) {
+        try {
+          process.loadEnvFile(envFile);
+        } catch {
+          /* ignore */
+        }
+      }
+      return;
+    }
+    dir = path.dirname(dir);
+  }
+})();
 
 export * from "@prisma/client";
 
