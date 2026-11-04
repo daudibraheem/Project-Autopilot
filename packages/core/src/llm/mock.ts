@@ -127,7 +127,7 @@ function g1Script(s: ScriptState): Decision {
 
 function quarantine(src: string, name: string, reason: string): string {
   const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return src.replace(new RegExp(`test\\((['"\`])${esc}\\1,\\s*`), (m, q) => `test(${q}${name}${q}, { skip: ${JSON.stringify(reason)} }, `);
+  return src.replace(new RegExp(`test\\((['"\`])${esc}\\1,\\s*`), (_m, q) => `test(${q}${name}${q}, { skip: ${JSON.stringify(reason)} }, `);
 }
 
 /** Revert the '+' lines of the cause commit's hunk for `file` back to the '-' lines. */

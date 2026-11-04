@@ -22,7 +22,7 @@ import { routeModels } from "./llm/router";
 import type { LlmResponse } from "./llm/types";
 import { loadLessons, searchLessons, writeLesson } from "./lessons";
 import { decide, failureRateFor, type FlakyDecision, loadFlakyModel, predictFlaky } from "./ml/flaky";
-import { FLAKY_SEEDS, parseTap, runAtRef, runInSandbox, TEST_COMMAND, testKey, trimOutput } from "./sandbox";
+import { FLAKY_SEEDS, parseTap, runAtRef, runInSandbox, TEST_COMMAND, testKey } from "./sandbox";
 import { parseCsv } from "./seed/ci-history";
 import { isKillSwitchOn } from "./settings";
 import { recordTrust, getTrust } from "./trust";

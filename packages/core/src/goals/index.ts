@@ -80,7 +80,7 @@ export async function goalOverview(): Promise<GoalOverview[]> {
       select: { status: true, summary: true, evidence: true, createdAt: true },
     });
     // include the last check before the window so a goal that was already red counts from window start
-    const inWindow = checks.filter((c, i) => c.createdAt >= since || checks[i + 1]?.createdAt! >= since);
+    const inWindow = checks.filter((c, i) => c.createdAt >= since || (checks[i + 1]?.createdAt ?? new Date(0)) >= since);
     const latest = checks.at(-1) ?? null;
     out.push({
       goalId: id,

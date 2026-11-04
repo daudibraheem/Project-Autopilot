@@ -61,7 +61,7 @@ export async function sandboxStatus(force = false): Promise<SandboxStatus> {
       status = { mode: "local", unsafe: true, reason: why };
     }
   }
-  if (status.unsafe && (!cached || !cached.status.unsafe)) {
+  if (status.unsafe && !cached?.status.unsafe) {
     console.warn(`\n⚠️  Unsafe: no container. Sandbox commands run directly on this machine (${status.reason}).\n`);
   }
   cached = { at: Date.now(), status };
@@ -101,9 +101,9 @@ export async function exportRef(repo: string, ref: string): Promise<string> {
 
 const MAX_OUT = 200_000;
 
-function runProcess(cmd: string, args: string[], opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs: number; onTimeout?: () => void }) {
+function runProcess(cmd: string, args: string[], opts: { cwd?: string; env?: Record<string, string | undefined>; timeoutMs: number; onTimeout?: () => void }) {
   return new Promise<{ code: number; stdout: string; stderr: string; timedOut: boolean }>((resolve) => {
-    const child = spawn(cmd, args, { cwd: opts.cwd, env: opts.env });
+    const child = spawn(cmd, args, { cwd: opts.cwd, env: opts.env as NodeJS.ProcessEnv | undefined });
     let stdout = "";
     let stderr = "";
     let timedOut = false;

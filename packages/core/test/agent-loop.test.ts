@@ -91,7 +91,9 @@ describe("agent loop budgets (hard stop)", () => {
     let last: StepRecord | undefined;
     await runAgentLoop(
       { ...base, budget: { maxSteps: 2, maxTokens: 1e9, maxUsd: 100, maxMinutes: 10 } },
-      { llm: endlessModel(), exec: async () => ({ content: "ok", isError: false }), record: async (s) => void (s.checkpoint && (last = s)), shouldStop: async () => null },
+      { llm: endlessModel(), exec: async () => ({ content: "ok", isError: false }), record: async (s) => {
+          if (s.checkpoint) last = s;
+        }, shouldStop: async () => null },
     );
     const resumed = await runAgentLoop(
       { ...base, budget: { maxSteps: 4, maxTokens: 1e9, maxUsd: 100, maxMinutes: 10 }, resume: last!.checkpoint },

@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f6f6f4;
+  --surface: #ffffff;
+  --surface-2: #f0f0ed;
+  --text: #1c1e22;
+  --muted: #5d626b;
+  --border: #e2e2de;
+  --accent: #2b50cf;
+  --accent-hover: #2343b3;
+  --accent-fg: #ffffff;
+  --green: #1d7f47;
+  --green-bg: #e6f4eb;
+  --amber: #9a5a00;
+  --amber-bg: #fcf1dd;
+  --red: #b8342a;
+  --red-bg: #fbeae8;
+  --add-bg: #e6f4eb;
+  --del-bg: #fbeae8;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #111214;
+  --surface: #18191c;
+  --surface-2: #202226;
+  --text: #e7e8eb;
+  --muted: #9ba0a8;
+  --border: #2b2e33;
+  --accent: #7d97ff;
+  --accent-hover: #94aaff;
+  --accent-fg: #0d1020;
+  --green: #4fc27f;
+  --green-bg: #14291c;
+  --amber: #efb24c;
+  --amber-bg: #2f240f;
+  --red: #ff7b6f;
+  --red-bg: #361917;
+  --add-bg: #13291b;
+  --del-bg: #351816;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-fg: var(--accent-fg);
+  --color-ok: var(--green);
+  --color-ok-bg: var(--green-bg);
+  --color-warn: var(--amber);
+  --color-warn-bg: var(--amber-bg);
+  --color-bad: var(--red);
+  --color-bad-bg: var(--red-bg);
+  --color-add: var(--add-bg);
+  --color-del: var(--del-bg);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Motion only to show that something changed (e.g. a goal turning green). */
+@keyframes status-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--flash) 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+.status-changed {
+  animation: status-flash 1.4s ease-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-changed {
+    animation: none;
+  }
+  * {
+    transition: none !important;
+  }
+}

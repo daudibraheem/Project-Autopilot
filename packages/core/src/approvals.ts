@@ -51,7 +51,7 @@ export async function publishDraftPr(jobId: string): Promise<string> {
   return pr.url;
 }
 
-async function afterMerge(jobId: string, reason: string) {
+async function afterMerge(reason: string) {
   // Re-check goals so the dashboard shows the goal turning green.
   await runGoalChecks(undefined, reason).catch((e) => console.error("[approvals] goal re-check failed", e));
 }
@@ -76,7 +76,7 @@ export async function approveJob(jobId: string, actor: "human" | "system" = "hum
   }
   const t = await recordTrust(job.jobType, "approved", jobId, note ?? "approved by human");
   await lesson(jobId, "pass", `gate all green; approved by ${actor}${note ? `: ${note}` : ""}`);
-  if (status === "merged") await afterMerge(jobId, `after merge of ${jobId}`);
+  if (status === "merged") await afterMerge(`after merge of ${jobId}`);
   return { status, trustChange: t.change };
 }
 

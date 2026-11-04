@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/.next", "!demo_target", "!.autopilot", "!**/migrations", "!**/next-env.d.ts", "!memory"]
+    "includes": ["**", "!**/node_modules", "!**/.next", "!demo_target", "!.autopilot", "!**/migrations", "!**/next-env.d.ts", "!memory", "!packages/core/src/seed/templates", "!**/*.css"]
   },
   "formatter": { "enabled": false },
   "linter": {
@@ -9,7 +9,7 @@
     "rules": {
       "recommended": true,
       "style": { "noNonNullAssertion": "off", "useTemplate": "off" },
-      "suspicious": { "noExplicitAny": "warn", "noControlCharactersInRegex": "off", "noArrayIndexKey": "off" },
+      "suspicious": { "noExplicitAny": "warn", "noArrayIndexKey": "off" },
       "complexity": { "noForEach": "off" },
       "a11y": { "noSvgWithoutTitle": "off" }
     }
