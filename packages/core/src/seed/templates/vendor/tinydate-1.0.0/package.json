@@ -1,0 +1,6 @@
+{
+  "name": "tinydate",
+  "version": "1.0.0",
+  "description": "Tiny ISO date helpers",
+  "main": "index.js"
+}

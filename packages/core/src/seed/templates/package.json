@@ -1,0 +1,15 @@
+{
+  "name": "invoice-calc",
+  "version": "1.3.0",
+  "private": true,
+  "description": "Tiny invoice calculator (Project Autopilot demo target)",
+  "scripts": {
+    "test": "node --test",
+    "lint": "node scripts/lint.js",
+    "bootstrap": "node scripts/bootstrap.js",
+    "start": "node src/cli.js --sample"
+  },
+  "dependencies": {
+    "tinydate": "file:vendor/tinydate-1.0.0"
+  }
+}
