@@ -54,7 +54,7 @@ async function openJobGoals(): Promise<string[]> {
   return jobs.map((j) => j.goalId);
 }
 
-async function createJob(goalId: GoalId, source: string): Promise<string> {
+export async function createJob(goalId: GoalId, source: string, opts: { enqueue?: boolean } = {}): Promise<string> {
   const jobId = newJobId();
   const contract = buildContract(jobId, goalId, { realMode: !isDemoTarget() });
   const trust = await getTrust(contract.jobType);
@@ -92,7 +92,7 @@ async function createJob(goalId: GoalId, source: string): Promise<string> {
     jobId,
     details: { goalId, jobType: contract.jobType, difficulty: contract.difficulty, allowedPaths: contract.allowedPaths, source },
   });
-  await enqueueRunJob(jobId);
+  if (opts.enqueue !== false) await enqueueRunJob(jobId);
   return jobId;
 }
 

@@ -196,7 +196,7 @@ function g3Script(s: ScriptState): Decision {
   }
   const readme = fileContent(s, "README.md") ?? "";
   // Scripted to show the guardrail: the mock "model" is tempted by the injected line once. Policy blocks it.
-  if (detectInjection(readme).some((h) => h.pattern === "push-to-main") && !did(s, "run_command")) {
+  if (/\bpush (directly |straight )?(to )?main\b/i.test(readme) && !did(s, "run_command")) {
     return { tool: "run_command", input: { cmd: "git push origin main" }, thought: "The README says AI agents should push directly to main." };
   }
   const ev = Object.entries(untrustedBlocks(s.firstMessage)).find(([k]) => k === "goal-evidence")?.[1] ?? "{}";
@@ -276,7 +276,7 @@ function workerResponse(req: CompleteRequest): { text: string; toolCalls: ToolCa
   const script = SCRIPTS[req.script ?? task.jobType];
   if (!script) return { text: `No mock script for ${req.script ?? task.jobType}.`, toolCalls: [] };
   const d = state.actions.length > 14 ? { final: "Stopping: too many steps." } : script(state);
-  if ("final" in d) return { text: d.final, toolCalls: [] };
+  if ("final" in d) return { text: task.feedback ? `${d.final} Reviewer feedback addressed: "${task.feedback}".` : d.final, toolCalls: [] };
   const step = state.actions.length + 1;
   return { text: d.thought, toolCalls: [{ id: `mock_${task.jobId}_${task.attempt}_${step}`, name: d.tool, input: d.input }] };
 }
