@@ -33,6 +33,10 @@
 | Audit log | `packages/core/src/audit.ts` | Writes `AuditEvent` for every action and every policy denial. |
 | Settings / kill switch | `packages/core/src/settings.ts` | `Setting` rows: kill switch, trust config. |
 | Queue | `packages/core/src/queue.ts` | pg-boss wrapper (`autopilot-check-goals`, `autopilot-run-job`, daily cron). |
+| Goal loop | `packages/core/src/checks.ts` | Check all goals, then let the conductor open jobs for red ones (daily cron). |
+| Task brief | `packages/core/src/agents/task.ts` | The worker's `<task>` (trusted, harness-computed) plus untrusted attachments. |
+| Dashboard read models | `packages/core/src/queries.ts` | Queries behind the API route handlers. |
+| Eval runner | `packages/cli/src/eval.ts`, `packages/cli/src/eval-cases.ts` | 10 verifier cases. Mock runner for CI; generates promptfoo files. |
 | Seeder | `packages/core/src/seed/*` | Generates the deterministic `demo_target` repo with the three planted problems. |
 | Evals | `evals/promptfoo.yaml`, `packages/cli/src/eval.ts` | Verifier prompt evals (promptfoo for real providers, mock runner for CI). |
 

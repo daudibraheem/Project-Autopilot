@@ -1,0 +1,102 @@
+# Project Autopilot
+
+A small "AI operating system" that keeps one software project healthy in the background. It:
+
+1. **Watches standing goals.** These are plain-code checks: no critical vulnerabilities, a green main build, setup docs that work.
+2. **Sends a worker AI to fix what's broken**, in a Docker sandbox, on an `autopilot/*` branch, under a contract and a budget.
+3. **Has a different AI verify the work.** It sees the diff and the evidence, not the worker's reasoning.
+4. **Lets plain code make the final pass/fail call** (the gate).
+5. **Asks a human before anything is merged.**
+6. **Keeps a trust score** per job type and **saves lessons** for the next run.
+
+The whole demo runs offline in mock mode: no API key, no internet.
+
+## Prerequisites
+
+- **Node.js 22+**
+- **pnpm**
+- **Docker**, for PostgreSQL 16 and the `node:22-slim` sandbox. Without Docker for the sandbox, it falls back to a local runner and shows an "Unsafe: no container" warning.
+
+## Quickstart
+
+```bash
+pnpm install
+pnpm demo
+```
+
+`pnpm demo` does the following:
+1. starts Postgres (`docker compose up -d db`);
+2. applies the Prisma migrations;
+3. resets the Autopilot tables and job queue;
+4. seeds `demo_target/` with three planted problems;
+5. trains the flaky-test classifier;
+6. checks the goals;
+7. starts the web app and worker together;
+8. prints the demo steps.
+
+Open **http://localhost:3000** and follow [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
+
+If port 5432 is already in use, set `AUTOPILOT_DB_PORT` and `DATABASE_URL` in `.env` to another port (for example 5434).
+
+### Useful commands
+
+| Command | What it does |
+|---|---|
+| `pnpm demo` / `pnpm demo:prepare` | Full reset + start / reset only |
+| `pnpm dev` | Start web + worker without resetting |
+| `pnpm cli seed [--real-bug] [--reintroduce g1]` | Seed `demo_target`, add a genuine bug, or re-plant G1 |
+| `pnpm cli check [--conduct]` | Run goal checks; optionally let the conductor open jobs |
+| `pnpm cli run g1 [--inline]` | Start a job (enqueued for the worker, or run in the CLI process) |
+| `pnpm cli approve <job>` / `reject <job> <reason>` / `request-changes <job> <feedback>` | Human decisions from the terminal |
+| `pnpm cli train` | Retrain the classifier and print held-out precision/recall |
+| `pnpm cli kill` / `pnpm cli resume` | Kill switch |
+| `pnpm cli demo-bad-worker` | Scripted out-of-scope worker; shows policy, verifier and gate blocking it |
+| `pnpm test` / `pnpm typecheck` / `pnpm lint` | Vitest / `tsc --noEmit` in every package / Biome |
+| `pnpm eval` | Verifier evals (mock provider, or a real one if configured) |
+| `pnpm eval:promptfoo` | The same 10 cases through promptfoo against a real provider |
+
+## Mock vs real mode
+
+| | Mock (default) | Real |
+|---|---|---|
+| `AUTOPILOT_LLM_PROVIDER` | `mock` | `anthropic` or `openai` |
+| Keys | none | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` |
+| Worker / verifier | Scripted, deterministic models that drive the real loop, tools, policy, sandbox and git | `WORKER_MODEL` / `VERIFIER_MODEL` (or `OPENAI_*`) |
+| Cost figures | Estimated from the pinned model's prices (characters ÷ 4) | From provider-reported token usage |
+
+- **Model routing:** easy contracts use `WORKER_MODEL`; hard ones use `HARD_WORKER_MODEL`. The router throws a config error if the verifier model equals the worker model for a job.
+- **Retries:** transient errors are retried with backoff. Set `AUTOPILOT_ALLOW_MOCK_FALLBACK=true` to fall back to mock after repeated failures; such jobs are marked **degraded**.
+- **Pointing at another repo:** set `TARGET_REPO_PATH` to any local Node repo. Without `advisories.json` and `vendor/`, real mode uses the **OSV API** for advisories and the **npm registry** for the package-existence check. `pnpm cli seed` refuses to overwrite a directory that isn't a seeded demo repo.
+
+## GitHub mode (optional)
+
+Set `GITHUB_TOKEN` (contents + pull-requests write only) and `GITHUB_REPO=owner/repo`.
+
+- At trust **L1+**, a job that passes the gate pushes `autopilot/<jobId>` and opens a **draft** PR.
+- At **L0**, nothing is pushed until a human approves.
+- **Approve** marks the draft PR **ready for review**. Autopilot never merges on GitHub.
+
+## Architecture summary
+
+```
+GoalChecker (plain code) → Conductor (contract, budget, dedupe, cap 3, kill switch) → pg-boss
+  → Worker (AI, bounded loop, policy-checked tools, Docker sandbox, autopilot/* branch)
+  → Verifier (different AI, strict JSON) → Gate (plain code, 9 checks, fresh sandbox)
+  → Approvals (human) → merge / draft PR ready → Trust ledger + Lessons
+```
+
+| Path | What |
+|---|---|
+| `apps/web` | Next.js dashboard and API route handlers |
+| `apps/worker` | pg-boss consumer and daily cron |
+| `packages/core` | Goals, conductor, agents, policy, gate, trust, lessons, LLM gateway, ML, sandbox, git |
+| `packages/db` | Prisma schema and migrations |
+| `packages/cli` | CLI and eval runner |
+| `evals/` | promptfoo config and generated cases |
+| `demo_target/` | Generated by the seeder (git-ignored) |
+
+More detail:
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): component map, Mermaid diagram, trust model, why the classifier is ML.
+- [`AGENTS.md`](AGENTS.md): the constitution, enforced in `packages/core/src/policy.ts`.
+- [`docs/PRD.md`](docs/PRD.md) and [`docs/DECISIONS.md`](docs/DECISIONS.md).
+- [`docs/PRESENTATION_OUTLINE.md`](docs/PRESENTATION_OUTLINE.md).

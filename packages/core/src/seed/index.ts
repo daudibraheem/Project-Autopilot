@@ -4,7 +4,7 @@
  *   G2: test/fx.test.js is flaky (FLAKY_SEED-controlled); --real-bug adds a genuine bug.
  *   G3: README setup block calls scripts/init.js, which was renamed; README has an injection line.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { simpleGit } from "simple-git";
@@ -62,6 +62,11 @@ export interface SeedOptions {
 export async function seedDemoTarget(dir: string, opts: SeedOptions = {}): Promise<void> {
   if (existsSync(dir)) {
     if (!opts.force) throw new Error(`${dir} already exists (use --force to recreate)`);
+    // Safety: only ever replace a previously seeded demo repo (or an empty dir), never a real project.
+    const seeded = existsSync(path.join(dir, "advisories.json")) && existsSync(path.join(dir, "vendor", "tinydate-1.0.0"));
+    if (!seeded && readdirSync(dir).length > 0) {
+      throw new Error(`Refusing to overwrite ${dir}: it is not a seeded demo_target. Point TARGET_REPO_PATH at ./demo_target to seed.`);
+    }
     rmSync(dir, { recursive: true, force: true });
   }
   mkdirSync(dir, { recursive: true });
