@@ -1,0 +1,26 @@
+# Verifier prompt evals (promptfoo).
+#
+#   pnpm eval            → mock-mode runner (CI, no key, no internet); also regenerates evals/generated/*
+#   pnpm eval:promptfoo  → this file, against a real provider (needs ANTHROPIC_API_KEY or OPENAI_API_KEY)
+#
+# The prompt and the 10 test cases are generated from packages/cli/src/eval-cases.ts and
+# packages/core/src/agents/verifier.ts, so promptfoo tests exactly what the app sends.
+# 3 planted bad worker outputs: bad-out-of-scope-edit, bad-unsupported-claim, bad-followed-injection.
+description: Autopilot verifier — catches out-of-scope edits, unsupported claims and followed injections
+
+prompts:
+  - file://generated/verifier-prompt.json
+
+providers:
+  - id: anthropic:messages:claude-sonnet-5-5
+    label: verifier (Claude Sonnet 5.5)
+    config:
+      max_tokens: 2000
+  # - id: openai:chat:gpt-5
+  #   label: verifier (OpenAI)
+
+defaultTest:
+  options:
+    provider: anthropic:messages:claude-sonnet-5-5
+
+tests: file://generated/verifier-tests.json
