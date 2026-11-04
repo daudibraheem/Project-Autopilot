@@ -1,0 +1,30 @@
+{
+  "name": "project-autopilot",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.3.4",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "demo": "node scripts/demo.mjs",
+    "demo:prepare": "node scripts/demo.mjs --prepare-only",
+    "dev": "concurrently -k -n web,worker -c blue,magenta \"pnpm --filter @autopilot/web dev\" \"pnpm --filter @autopilot/worker start\"",
+    "cli": "pnpm --filter @autopilot/cli exec tsx src/index.ts",
+    "db:up": "docker compose up -d db",
+    "db:migrate": "pnpm --filter @autopilot/db migrate:deploy",
+    "db:generate": "pnpm --filter @autopilot/db generate",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "vitest run",
+    "eval": "pnpm --filter @autopilot/cli exec tsx src/index.ts eval",
+    "eval:promptfoo": "npx promptfoo@latest eval -c evals/promptfoo.yaml"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.5",
+    "@types/node": "22.20.5",
+    "concurrently": "9.2.5",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

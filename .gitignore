@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env
+.env.local
+*.log
+.autopilot/
+/demo_target/
+!/packages/core/src/seed/templates/
+coverage/
+evals/output/
+.DS_Store
+*.tsbuildinfo

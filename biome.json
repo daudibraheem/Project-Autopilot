@@ -1,0 +1,18 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.5/schema.json",
+  "files": {
+    "includes": ["**", "!**/node_modules", "!**/.next", "!demo_target", "!.autopilot", "!**/migrations", "!**/next-env.d.ts", "!memory"]
+  },
+  "formatter": { "enabled": false },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": { "noNonNullAssertion": "off", "useTemplate": "off" },
+      "suspicious": { "noExplicitAny": "warn", "noControlCharactersInRegex": "off", "noArrayIndexKey": "off" },
+      "complexity": { "noForEach": "off" },
+      "a11y": { "noSvgWithoutTitle": "off" }
+    }
+  },
+  "assist": { "enabled": false }
+}

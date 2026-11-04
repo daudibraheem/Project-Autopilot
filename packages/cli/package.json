@@ -1,0 +1,15 @@
+{
+  "name": "@autopilot/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "autopilot": "src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@autopilot/core": "workspace:*",
+    "@autopilot/db": "workspace:*",
+    "commander": "13.1.0"
+  }
+}
