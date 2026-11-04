@@ -69,7 +69,7 @@ export function buildContract(jobId: string, goalId: GoalId, opts: { realMode?: 
     case "main-build-green":
       return Contract.parse({
         ...base,
-        difficulty: "hard",
+        difficulty: "easy",
         allowedPaths: ["src/**", "test/**"],
         forbiddenPaths: withHighRisk(["package.json", "vendor/**", "ci_history.csv"]),
         riskLevel: "medium",
