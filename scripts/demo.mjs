@@ -8,7 +8,7 @@
  * `pnpm demo:prepare` does 1–7 only.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +28,16 @@ function run(cmd, args, opts = {}) {
     process.exit(r.status ?? 1);
   }
   return r;
+}
+
+/** A variable from .env (without loading it into process.env). */
+function readEnvVar(name) {
+  try {
+    const line = readFileSync(path.join(ROOT, ".env"), "utf8").split("\n").find((l) => l.startsWith(`${name}=`));
+    return line ? line.slice(name.length + 1).split("#")[0].trim() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Database name from DATABASE_URL (env, else .env), default "autopilot". */
@@ -57,6 +67,21 @@ if (!existsSync(path.join(ROOT, ".env"))) {
 }
 
 step("1/7 Starting PostgreSQL 16 (docker compose up -d db)");
+{
+  // If our container isn't running yet, make sure its host port is free and explain how to fix it if not.
+  const port = Number(process.env.AUTOPILOT_DB_PORT || readEnvVar("AUTOPILOT_DB_PORT") || 5432);
+  const running = run("docker", ["compose", "ps", "-q", "--status", "running", "db"], { quiet: true, allowFail: true }).stdout?.trim();
+  if (!running) {
+    const probe = spawnSync(process.execPath, ["-e", `require("net").createServer().once("error",()=>process.exit(1)).listen(${port},"0.0.0.0",function(){this.close(()=>process.exit(0))})`]);
+    if (probe.status !== 0) {
+      console.error(`${c.red}✗ Port ${port} is already in use on this machine, so Postgres can't start there.${c.reset}`);
+      console.error(`  Fix: in .env set AUTOPILOT_DB_PORT to a free port (e.g. 5434) and use the same port in DATABASE_URL:`);
+      console.error(`    AUTOPILOT_DB_PORT=5434`);
+      console.error(`    DATABASE_URL=postgresql://autopilot:autopilot@localhost:5434/autopilot`);
+      process.exit(1);
+    }
+  }
+}
 run("docker", ["compose", "up", "-d", "db"]);
 let ready = false;
 for (let i = 0; i < 60 && !ready; i++) {
