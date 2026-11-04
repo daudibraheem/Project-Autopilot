@@ -61,26 +61,27 @@ export function generateCiHistory(runs = 300, seed = 42, end = new Date("2026-10
     const roll = r();
     const flakyP = busy ? 0.32 : 0.2;
     if (roll < flakyP) {
-      // flaky: fx test times out; re-run usually passes; test file rarely touched
+      // flaky: mostly the fx test timing out (sometimes a timezone-sensitive due-date test); re-run usually passes
+      const t = r() < 0.85 ? TESTS[0]! : TESTS[3]!;
       rows.push({
         ...base,
-        test_file: TESTS[0]!.file,
-        test_name: TESTS[0]!.name,
+        test_file: t.file,
+        test_name: t.name,
         failed: 1,
-        rerun_passed: r() < 0.9 ? 1 : 0,
+        rerun_passed: r() < 0.78 ? 1 : 0,
         test_file_touched: r() < 0.05 ? 1 : 0,
         label: "flaky",
       });
     } else if (roll < flakyP + 0.17) {
       // real failure in one of the stable tests: re-run fails, often touches the test or many files
-      const t = TESTS[1 + Math.floor(r() * (TESTS.length - 1))]!;
+      const t = r() < 0.12 ? TESTS[0]! : TESTS[1 + Math.floor(r() * (TESTS.length - 1))]!;
       rows.push({
         ...base,
         files_changed: filesChanged + Math.floor(r() * 6),
         test_file: t.file,
         test_name: t.name,
         failed: 1,
-        rerun_passed: r() < 0.08 ? 1 : 0,
+        rerun_passed: r() < 0.18 ? 1 : 0,
         test_file_touched: r() < 0.45 ? 1 : 0,
         label: "real",
       });
