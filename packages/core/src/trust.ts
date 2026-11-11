@@ -6,6 +6,7 @@
  */
 import { prisma } from "@autopilot/db";
 import { audit } from "./audit";
+import { trustCap } from "./policy";
 import { getSetting } from "./settings";
 
 export interface TrustState {
@@ -30,8 +31,8 @@ export const DEFAULT_PROMOTE_AFTER = 3;
 export const EMPTY_TRUST: TrustState = { level: 0, consecutivePasses: 0, totalRuns: 0, approvals: 0, rejections: 0, gateFailures: 0 };
 
 /** Pure state transition (unit-tested). */
-export function applyTrust(prev: TrustState, input: TrustInput, promoteAfter = DEFAULT_PROMOTE_AFTER): TrustTransition {
-  const s = { ...prev };
+export function applyTrust(prev: TrustState, input: TrustInput, promoteAfter = DEFAULT_PROMOTE_AFTER, maxLevel = MAX_LEVEL): TrustTransition {
+  const s = { ...prev, level: Math.min(prev.level, maxLevel) };
   switch (input) {
     case "run":
       s.totalRuns++;
@@ -39,7 +40,7 @@ export function applyTrust(prev: TrustState, input: TrustInput, promoteAfter = D
     case "approved": {
       s.approvals++;
       s.consecutivePasses++;
-      if (s.consecutivePasses >= promoteAfter && s.level < MAX_LEVEL) {
+      if (s.consecutivePasses >= promoteAfter && s.level < maxLevel) {
         const from = s.level;
         s.level++;
         s.consecutivePasses = 0;
@@ -65,7 +66,10 @@ export async function getTrust(jobType: string) {
   return {
     jobType,
     ...(row ?? EMPTY_TRUST),
-    autoMergeAllowed: Boolean(autoMerge[jobType] ?? row?.autoMergeAllowed ?? false),
+    // Hard caps (e.g. nudge-draft = L0 forever) win over anything stored or configured.
+    level: Math.min((row ?? EMPTY_TRUST).level, trustCap(jobType, MAX_LEVEL)),
+    cap: trustCap(jobType, MAX_LEVEL),
+    autoMergeAllowed: trustCap(jobType, MAX_LEVEL) < MAX_LEVEL ? false : Boolean(autoMerge[jobType] ?? row?.autoMergeAllowed ?? false),
     lastFailureAt: row?.lastFailureAt ?? null,
     lastFailureReason: row?.lastFailureReason ?? null,
   };
@@ -76,7 +80,7 @@ export async function recordTrust(jobType: string, input: TrustInput, jobId: str
   const promoteAfter = await getSetting<number>("trust.promoteAfter", DEFAULT_PROMOTE_AFTER);
   const row = await prisma.trustRecord.findUnique({ where: { jobType } });
   const prev: TrustState = row ?? EMPTY_TRUST;
-  const t = applyTrust(prev, input, promoteAfter);
+  const t = applyTrust(prev, input, promoteAfter, trustCap(jobType, MAX_LEVEL));
   const failed = input === "rejected" || input === "gate_failed";
   await prisma.trustRecord.upsert({
     where: { jobType },

@@ -6,6 +6,10 @@ export const DEFAULT_SETTINGS: Record<string, unknown> = {
   "trust.promoteAfter": 3,
   "trust.autoMergeAllowed": {},
   "conductor.maxOpenJobs": 3,
+  "sprint.normalWaitingStatuses": ["Waiting for QA"],
+  "sprint.stuckThresholdDays": 2,
+  "sprint.standupTime": "09:30",
+  "team.forbiddenTerms": [],
 };
 
 export async function seedSettings(): Promise<void> {

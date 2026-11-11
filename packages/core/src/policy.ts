@@ -193,3 +193,62 @@ export function pathViolations(scope: PathScope, changed: string[]): { path: str
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Team data rules (Scrum Mode) — AGENTS.md rules 8–13
+// ---------------------------------------------------------------------------
+
+/** Hard trust caps per job type. Code-only: no setting can raise these (AGENTS.md rule 10). */
+export const HARD_TRUST_CAPS: Readonly<Record<string, number>> = Object.freeze({ "nudge-draft": 0 });
+
+export function trustCap(jobType: string, defaultMax = 2): number {
+  return Object.hasOwn(HARD_TRUST_CAPS, jobType) ? Math.min(HARD_TRUST_CAPS[jobType]!, defaultMax) : defaultMax;
+}
+
+/** Rule 11: the Jira client is read-only. */
+export function checkHttpMethod(method: string): PolicyDecision {
+  return method.toUpperCase() === "GET" ? ALLOW : deny("read-only-integration", `Only GET requests are allowed to Jira (got ${method.toUpperCase()})`);
+}
+
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Name tokens to look for: full names plus each part with ≥ 3 letters. */
+export function nameTokens(realNames: string[]): string[] {
+  const out = new Set<string>();
+  for (const n of realNames) {
+    const full = n.trim();
+    if (full.length >= 3) out.add(full);
+    for (const part of full.split(/\s+/)) if (part.length >= 3) out.add(part);
+  }
+  return [...out].sort((a, b) => b.length - a.length);
+}
+
+/** Rule 9: no real name may appear in text sent to (or returned by) a model. */
+export function checkNoRealNames(text: string, realNames: string[]): PolicyDecision & { found?: string[] } {
+  const found = nameTokens(realNames).filter((t) => new RegExp(`(^|[^\\p{L}])${esc(t)}($|[^\\p{L}])`, "iu").test(text));
+  return found.length ? { ...deny("real-name-leak", `Real name(s) found: ${found.length} match(es)`), found } : ALLOW;
+}
+
+/** Built-in people-judgement patterns (rule 8). Extended at runtime by the `team.forbiddenTerms` setting. */
+export const PEOPLE_JUDGEMENT_PATTERNS: { kind: string; re: RegExp }[] = [
+  { kind: "judgement", re: /\b(lazy|slow(er|est)?|underperform\w*|incompetent|careless|sloppy|unreliable|unproductive|useless|weak link|not pulling (their|his|her) weight|holding (everyone|the team|us) back)\b/i },
+  { kind: "ranking", re: /\b(best|worst|fastest|slowest|top|bottom|most|least)\s+(\w+\s+)?(developer|engineer|member|person|performer|contributor|teammate)s?\b/i },
+  { kind: "ranking", re: /\b(member [a-z])\b[^.]*\b(than|compared (to|with)|ahead of|behind)\b[^.]*\bmember [a-z]\b/i },
+  { kind: "mood", re: /\b(frustrated|unhappy|stressed|angry|upset|burn(ed|t)[ -]out|demotivated|disengaged|annoyed|moody)\b/i },
+  { kind: "personal-reason", re: /\b(sick|illness|personal (issues|problems|reasons|life)|family (issues|problems)|distracted|on holiday|hungover|probably (busy|away|off))\b/i },
+  { kind: "speculation", re: /\b(probably|maybe|perhaps|likely|must be)\b[^.]*\b(because|due to)\b[^.]*\b(they|he|she|member [a-z])\b/i },
+  { kind: "blame", re: /\b(fault|to blame|blame[sd]?|dropped the ball|let (the team|us) down)\b/i },
+];
+
+export function checkPeopleJudgement(text: string, extraTerms: string[] = []): PolicyDecision & { hits?: { kind: string; match: string }[] } {
+  const hits: { kind: string; match: string }[] = [];
+  for (const p of PEOPLE_JUDGEMENT_PATTERNS) {
+    const m = p.re.exec(text);
+    if (m) hits.push({ kind: p.kind, match: m[0] });
+  }
+  for (const t of extraTerms.filter((x) => x.trim())) {
+    const m = new RegExp(`\\b${esc(t.trim())}\\b`, "i").exec(text);
+    if (m) hits.push({ kind: "configured-term", match: m[0] });
+  }
+  return hits.length ? { ...deny("people-judgement", `Judgement of people: ${hits.map((h) => `${h.kind} "${h.match}"`).join(", ")}`), hits } : ALLOW;
+}
