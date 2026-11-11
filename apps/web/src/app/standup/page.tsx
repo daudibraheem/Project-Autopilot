@@ -105,7 +105,7 @@ export default function StandupPage() {
             </Section>
           </div>
           <div className="space-y-6">
-            <Section title="Counts" aside="recomputed from the database">
+            <Section title="Counts now" aside="recomputed from the database">
               <Counts counts={data.counts} />
               {data.brief?.content?.counts && (
                 <p className="mt-3 text-xs text-muted">
