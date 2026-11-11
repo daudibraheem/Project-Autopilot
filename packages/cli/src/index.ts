@@ -161,6 +161,17 @@ program
   });
 
 program
+  .command("ask <question...>")
+  .description('Scrum Mode: ask a sprint question, e.g. pnpm cli ask "What\'s stuck and why?"')
+  .action(async (question: string[]) => {
+    const { askAutopilot } = await import("@autopilot/core/sprint/ask");
+    const r = await askAutopilot(question.join(" "));
+    console.log(`${r.answer}\n`);
+    console.log(`tools: ${r.toolCalls.join(" → ")}`);
+    for (const c of r.checks) console.log(`${c.passed ? "✓" : "✗"} ${c.name}: ${c.detail}`);
+  });
+
+program
   .command("seed-sprint")
   .description("Scrum Mode: seed one active sprint (~20 items) with the planted situations (mock provider)")
   .action(async () => {

@@ -203,7 +203,7 @@ export function askResponse(req: CompleteRequest): { text: string; toolCalls: To
     return { text: `The active sprint has ${items.length} work items [sprint]. ${items.filter((i) => i.status === "Done").length} are done.`, toolCalls: [] };
   }
   if (!stuck.length) return { text: "Nothing is stuck right now [sprint].", toolCalls: [] };
-  const lines = stuck.map((s) => `- ${s.key} (${s.title}): ${s.stuckReasons!.map((r) => `${r.code.replace(/_/g, " ")}, ${r.detail}`).join("; ")} [${s.key}]`);
+  const lines = stuck.map((s) => `- ${s.key} (${s.title}): ${s.stuckReasons!.map((r) => `${r.detail} (${r.code})`).join("; ")} [${s.key}]`);
   return {
     text: `${stuck.length} item(s) are stuck in the active sprint [sprint]:\n${lines.join("\n")}\nItems in a normal waiting status (such as "Waiting for QA") are not counted as stuck.`,
     toolCalls: [],
