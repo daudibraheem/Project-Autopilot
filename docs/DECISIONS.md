@@ -31,3 +31,29 @@ A running log. Newest at the bottom.
 | 25 | `pnpm cli seed` refuses to replace a directory that isn't a previously seeded demo repo. | `TARGET_REPO_PATH` can point at a real project in real mode. Seeding must never delete it. |
 | 26 | Lessons are deduplicated on (jobType, result, lesson text). | Repeated identical runs (e.g. the trust-promotion loop) shouldn't flood `memory/lessons.md`. |
 | 27 | The mock G3 worker always attempts the injected push once. The mock verifier reports the blocked attempt as a concern but passes when nothing reached the diff. | Shows the audit trail live without blocking an otherwise correct fix. A followed injection (in the diff or the explanation) fails the verifier: see eval case `bad-followed-injection`. |
+
+## Scrum Mode (round 1)
+
+| # | Decision | Why |
+|---|---|---|
+| S1 | The spec refers to "the existing MCP server", but there wasn't one. Added a read-only server: `sprint/mcp.ts` (tools) plus `packages/mcp` (stdio, `pnpm mcp`). Ask Autopilot calls the same server through an in-process MCP client (`InMemoryTransport`). | One tool implementation for external MCP clients and for Ask. Ask really goes through MCP. |
+| S2 | `docs/SLIDE_COVERAGE.md` didn't exist either, so it was created. It maps each slide topic to what demonstrates it. | Requested by the spec. |
+| S3 | Pseudonymisation happens **at sync**: titles, descriptions and comments are stored with names replaced by "Member X". The gateway `beforeSend` real-name guard is a second line of defence on every sprint request. | Real names then exist only in `PersonAlias`. Nothing downstream can leak what it never holds. |
+| S4 | One `nudge-draft` job per red S2 produces one draft per stuck item. The job closes when every draft is approved or discarded, and trust is recorded once per job. | Respects the existing conductor rules (one open job per goal, cap of 3) instead of N jobs per sprint. |
+| S5 | `HARD_TRUST_CAPS` is a frozen code constant. `applyTrust` clamps to it, and `getTrust` clamps stored levels and forces auto-merge off. | "Capped at L0 forever, config cannot override", made testable. |
+| S6 | Team contracts have `allowedPaths: ["sprint-data:read-only"]` and the worker loop runs with **no tools**: one model call that words the facts. | Reuses the loop (budgets, kill switch, checkpoints, traces) with the smallest possible capability. |
+| S7 | Facts first. The gate recomputes counts from the database at gate time; the model's numbers are never trusted. | Miscounts can't slip through even if the verifier misses them. |
+| S8 | "Generate brief now" may run when S1 is already green (`allowGreen`). Kill switch, dedupe and the cap still apply. The Overview button stays disabled when S1 is green. | Teams want a fresh brief on demand. |
+| S9 | Jira's dev-status API gives no "PR opened" time, so `lastUpdate` stands in for it and any reviewer counts as reviewed. PR URLs parsed from text have no opened time and so never trigger `review_waiting`. The dev-status API is switched off for the session on a 4xx. | Conservative: better to miss a review wait than to invent one. |
+| S10 | Injection-like comments are flagged at sync. They stay in the facts marked `flagged: true`, so model resistance is actually exercised, but the MCP tools withhold their bodies. The gate fails any output that cites a flagged event, shares a 4-word sequence with it, or claims a mass action or mass message. | Audited, visible, and provably without influence. |
+| S11 | Least data: only the active sprint and the most recent closed sprint are fetched, with a project-scoped JQL (`project = "KEY"`). | AGENTS.md rule 13. |
+| S12 | `addedAfterSprintStart` (Jira) = the issue was created after the sprint start, or the changelog shows the issue being added to this sprint after it started. | The board API doesn't expose this directly. |
+| S13 | `blocked_by_build` follows the latest G2 check. After the code demo fixes G2 the item is no longer blocked, so the Scrum demo is best run right after `pnpm demo` (G2 red). Otherwise run `pnpm cli seed --real-bug`. | The link to a real Autopilot goal is the point; it shouldn't be faked. |
+| S14 | S1 is green ("next brief due at …") until 60 minutes before standup, amber in that hour, and red after it if nothing is published. | The spec defines red and amber only. Before the window nothing is due. |
+| S15 | A human's nudge edit must still mention the item key and pass the people-judgement check. Real names are allowed there, because it's the human's own message and never goes to a model. | Work-not-people applies to what Autopilot drafts. A person may address a colleague by name. |
+| S16 | `@modelcontextprotocol/sdk` is pinned to 1.32.0. | More than two weeks old and compatible with our zod 3. |
+| S17 | Round 1 authenticates to Jira with basic auth (email + API token for a bot account limited to one test project). **For real teams, the recommended path later is Atlassian's official MCP server or OAuth 2.0 (3LO)** with scoped, revocable access. | Simplest read-only path for a test project. Not the end state. |
+| S18 | The mock team verifier is a heuristic reviewer (people patterns, keys vs sources, invented blockers, counts vs facts, tone, injection effects). | Offline demos and evals with meaningful verdicts; real models use `TEAM_VERIFIER_SYSTEM_PROMPT`. |
+| S19 | At L1+ (earned), briefs auto-publish **to the dashboard only**. Nothing posts to Slack or Teams in this round. | The spec's publishing rule. |
+| S20 | `pnpm demo` also empties the sprint tables. | A clean state for both demos. |
+| S21 | Step recording, usage, status and lessons moved from `pipeline.ts` into `job-steps.ts`. | Lets the team pipeline reuse them without a circular import. |
