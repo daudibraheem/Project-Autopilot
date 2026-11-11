@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { ApprovalActions } from "@/components/ApprovalActions";
 import { ContractView, Diff, GateChecklist, VerifierView } from "@/components/job";
+import { BriefView, Counts, NudgeCard } from "@/components/team";
 import { Empty, ErrorNote, Loading, Mono, PageHeader } from "@/components/ui";
 import { timeAgo, usd } from "@/lib/format";
 import type { JobDetail, SystemInfo } from "@/lib/types";
@@ -12,7 +13,66 @@ interface Queue {
   recent: { id: string; jobId: string; decision: string; reason: string | null; actor: string; createdAt: string; job: { goalId: string; jobType: string } }[];
 }
 
+function TeamReview({ job, onDone }: { job: JobDetail; onDone: () => void }) {
+  const report = job.verifierReports.find((r) => r.attempt === job.attempt) ?? job.verifierReports[0];
+  const passed = job.gateResults.filter((g) => g.passed).length;
+  const team = job.team!;
+  const isBrief = job.jobType === "standup-brief";
+  return (
+    <article className="rounded-xl border border-line bg-surface">
+      <header className="flex flex-wrap items-start justify-between gap-4 border-b border-line px-6 py-4">
+        <div>
+          <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">{isBrief ? "Brief" : "Nudge"}</span>
+          <h2 className="mt-2 text-lg font-semibold">{isBrief ? "Standup brief" : `Nudge drafts for ${team.nudges.length} stuck item(s)`}</h2>
+          <p className="mt-1 text-sm text-muted">
+            <Link href={`/jobs/${job.id}`} className="font-mono text-accent hover:underline">
+              {job.id}
+            </Link>{" "}
+            · {job.jobType} · {usd(job.costUsd)} · {isBrief ? "approving publishes it to the dashboard only" : "drafts only: Autopilot never sends anything; trust is capped at L0"}
+          </p>
+        </div>
+        <div className="text-right text-sm">
+          <div className="font-medium text-ok">
+            Gate {passed}/{job.gateResults.length} green
+          </div>
+          <div className="text-muted">Verifier: {report?.verdict ?? "–"}</div>
+        </div>
+      </header>
+      <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-5">
+          {isBrief && team.brief?.content?.sections ? (
+            <>
+              <BriefView content={team.brief.content} people={team.people} />
+              <div className="border-t border-line pt-4">
+                <Counts counts={team.brief.content.counts} label="Counts as written in the brief (the gate checked them against the database)." />
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3">
+              {team.nudges.map((n) => (
+                <NudgeCard key={n.id} n={n} people={team.people} onDone={onDone} />
+              ))}
+            </div>
+          )}
+          <div>
+            <h3 className="mb-2 text-sm font-semibold">Verifier report</h3>
+            <VerifierView report={report} scope="saw the plain-code facts and the output only (pseudonymised)" />
+          </div>
+        </div>
+        <div>
+          <h3 className="mb-2 text-sm font-semibold">Gate checklist</h3>
+          <GateChecklist results={job.gateResults} />
+        </div>
+      </div>
+      <footer className="border-t border-line bg-surface-2/60 px-6 py-4">
+        <ApprovalActions jobId={job.id} attempt={job.attempt} onDone={onDone} approveLabel="Approve and publish" hideApprove={!isBrief} />
+      </footer>
+    </article>
+  );
+}
+
 function Review({ job, githubMode, onDone }: { job: JobDetail; githubMode?: boolean; onDone: () => void }) {
+  if (job.team) return <TeamReview job={job} onDone={onDone} />;
   const report = job.verifierReports.find((r) => r.attempt === job.attempt) ?? job.verifierReports[0];
   const passed = job.gateResults.filter((g) => g.passed).length;
   return (
@@ -78,7 +138,8 @@ export default function ApprovalsPage() {
         subtitle={
           <>
             Changes that passed the verifier and every gate check. At trust levels 0–1 nothing merges without you.{" "}
-            {sys?.githubMode ? "Approving marks the draft PR ready for review; it never auto-merges." : <>Approving merges the <Mono>autopilot/*</Mono> branch into <Mono>main</Mono> of the target repo.</>}
+            {sys?.githubMode ? "Approving marks the draft PR ready for review; it never auto-merges." : <>Approving a code job merges the <Mono>autopilot/*</Mono> branch into <Mono>main</Mono> of the target repo.</>}{" "}
+            Approving a brief publishes it to the dashboard; nudges are drafts you copy and send yourself.
           </>
         }
       />

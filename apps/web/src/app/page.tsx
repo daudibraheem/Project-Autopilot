@@ -58,6 +58,13 @@ function evidenceLines(g: GoalView): string[] {
     const f = (ev.failures as { file: string; name: string; rerunPassed: boolean; message: string }[]) ?? [];
     return f.map((x) => `${x.file} › ${x.name} — ${x.message}${x.rerunPassed ? " (passed on CI re-run)" : ""}`);
   }
+  if (g.goalId === "standup-brief-ready") {
+    return [`standup time ${String(ev.standupTime ?? "09:30")}`, ev.awaitingApprovalBriefId ? "a brief is waiting in Approvals" : "", ev.publishedBriefId ? "today's brief is published" : ""].filter(Boolean);
+  }
+  if (g.goalId === "no-stuck-work") {
+    const s = (ev.stuck as { key: string; title: string; reasons: { code: string; detail: string }[] }[]) ?? [];
+    return s.map((x) => `${x.key} · ${x.reasons.map((r) => r.code).join(", ")} · ${x.reasons[0]?.detail ?? ""}`);
+  }
   const steps = (ev.steps as { command: string; exitCode: number }[]) ?? [];
   return steps.map((s) => `${s.exitCode === 0 ? "✓" : "✕"} ${s.command}${s.exitCode ? `  (exit ${s.exitCode})` : ""}`);
 }
@@ -89,7 +96,7 @@ function GoalPanel({ g, openJob, onRun, killSwitch }: { g: GoalView; openJob?: {
     >
       <div className={cx("border-l-4 pl-4", status === "green" ? "border-ok" : status === "red" ? "border-bad" : status === "amber" ? "border-warn" : "border-line")}>
         <div className="font-mono text-xs text-muted">{GOAL_SHORT[g.goalId]}</div>
-        <h2 className="mt-1 text-base font-semibold leading-snug">{g.label.replace(/^G\d · /, "")}</h2>
+        <h3 className="mt-1 text-base font-semibold leading-snug">{g.label.replace(/^[GS]\d · /, "")}</h3>
         <div className="mt-3">
           <GoalStatus status={status} large />
         </div>
@@ -145,7 +152,7 @@ function GoalPanel({ g, openJob, onRun, killSwitch }: { g: GoalView; openJob?: {
                 }
               }}
             >
-              Run job
+              {g.goalId === "standup-brief-ready" ? "Generate brief" : g.goalId === "no-stuck-work" ? "Draft nudges" : "Run job"}
             </Button>
             {err && <span className="max-w-[170px] text-xs text-bad">{err}</span>}
           </div>
@@ -223,8 +230,27 @@ export default function OverviewPage() {
               <dd className="mt-1 text-xl font-semibold">{timeAgo(data.lastCheckAt)}</dd>
             </div>
           </dl>
+          <h2 className="mb-3 text-sm font-semibold">Code health</h2>
           <div className="space-y-4">
             {data.goals.map((g) => (
+              <GoalPanel
+                key={g.goalId}
+                g={g}
+                killSwitch={data.killSwitch}
+                openJob={data.openJobs.find((j) => j.goalId === g.goalId)}
+                onRun={async () => {
+                  setRunErr(null);
+                  await post(`/api/goals/${g.goalId}/run`);
+                  await refresh();
+                }}
+              />
+            ))}
+          </div>
+          <h2 className="mt-10 mb-3 text-sm font-semibold">
+            Team health <span className="font-normal text-muted">· Scrum Mode, from sprint data (pseudonymised)</span>
+          </h2>
+          <div className="space-y-4">
+            {(data.teamGoals ?? []).map((g) => (
               <GoalPanel
                 key={g.goalId}
                 g={g}

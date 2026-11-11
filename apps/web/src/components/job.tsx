@@ -125,7 +125,7 @@ export function GateChecklist({ results }: { results: JobDetail["gateResults"] }
   );
 }
 
-export function VerifierView({ report }: { report?: JobDetail["verifierReports"][number] }) {
+export function VerifierView({ report, scope }: { report?: JobDetail["verifierReports"][number]; scope?: string }) {
   if (!report) return <Empty>The verifier has not run yet.</Empty>;
   return (
     <div className="space-y-4">
@@ -134,7 +134,7 @@ export function VerifierView({ report }: { report?: JobDetail["verifierReports"]
           Verdict: {report.verdict}
         </span>
         <span className="text-xs text-muted">
-          <Mono>{report.model}</Mono> via {report.provider} · saw contract, diff, evidence and explanation only
+          <Mono>{report.model}</Mono> via {report.provider} · {scope ?? "saw contract, diff, evidence and explanation only"}
         </span>
       </div>
       <ul className="space-y-2">

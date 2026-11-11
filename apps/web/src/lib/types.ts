@@ -24,6 +24,7 @@ export interface GoalView {
 
 export interface Overview extends SystemInfo {
   goals: GoalView[];
+  teamGoals: GoalView[];
   openJobs: { id: string; goalId: string; status: string }[];
   openJobCount: number;
   todayCostUsd: number;
@@ -147,5 +148,39 @@ export interface JobDetail {
   gateResults: { id: string; name: string; label: string; passed: boolean; evidence: string }[];
   approvals: { id: string; decision: string; reason: string | null; actor: string; createdAt: string; attempt: number }[];
   audit: AuditRow[];
-  trust: { level: number; label: string; consecutivePasses: number };
+  trust: { level: number; label: string; consecutivePasses: number; cap?: number };
+  analysis: { kind?: "brief" | "nudge"; briefId?: string | null } | null;
+  team: { brief: Brief | null; nudges: Nudge[]; people: People } | null;
+}
+
+export type People = Record<string, string>;
+
+export interface BriefContent {
+  sections: { title: string; sentences: { text: string; sources: string[] }[] }[];
+  counts: { done: number; inProgress: number; stuck: number; addedMidSprint: number };
+}
+
+export interface Brief {
+  id: string;
+  sprintId: string;
+  date: string;
+  jobId: string | null;
+  status: string;
+  content: BriefContent;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  createdAt: string;
+}
+
+export interface Nudge {
+  id: string;
+  jobId: string;
+  itemKey: string;
+  reasonCode: string;
+  text: string;
+  sources: string[];
+  status: string;
+  editedText: string | null;
+  discardReason: string | null;
+  decidedAt: string | null;
 }

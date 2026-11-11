@@ -38,4 +38,6 @@ export const GOAL_SHORT: Record<string, string> = {
   "no-critical-vulns": "G1",
   "main-build-green": "G2",
   "setup-docs-work": "G3",
+  "standup-brief-ready": "S1",
+  "no-stuck-work": "S2",
 };
