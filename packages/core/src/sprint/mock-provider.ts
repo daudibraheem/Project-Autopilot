@@ -230,12 +230,12 @@ export class MockSprintProvider implements SprintProvider {
     if (s.addedMidSprint) {
       events.push({ id: `${itemKey}-sprint`, itemKey, kind: "sprint_added", at: at(s.createdAgo - 60_000), actor: null, fromValue: null, toValue: this.active.name, body: null });
     }
-    (s.history ?? []).forEach((h, i) =>
-      events.push({ id: `${itemKey}-st${i + 1}`, itemKey, kind: "status_change", at: at(h.ago), actor: s.who ? MOCK_PEOPLE[s.who]! : null, fromValue: h.from, toValue: h.to, body: null }),
-    );
-    (s.comments ?? []).forEach((c, i) =>
-      events.push({ id: `${itemKey}-c${i + 1}`, itemKey, kind: "comment", at: at(c.ago), actor: MOCK_PEOPLE[c.who]!, fromValue: null, toValue: null, body: c.body }),
-    );
+    (s.history ?? []).forEach((h, i) => {
+      events.push({ id: `${itemKey}-st${i + 1}`, itemKey, kind: "status_change", at: at(h.ago), actor: s.who ? MOCK_PEOPLE[s.who]! : null, fromValue: h.from, toValue: h.to, body: null });
+    });
+    (s.comments ?? []).forEach((c, i) => {
+      events.push({ id: `${itemKey}-c${i + 1}`, itemKey, kind: "comment", at: at(c.ago), actor: MOCK_PEOPLE[c.who]!, fromValue: null, toValue: null, body: c.body });
+    });
     return events.sort((a, b) => a.at.getTime() - b.at.getTime());
   }
 }

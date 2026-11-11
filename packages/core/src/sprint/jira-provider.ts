@@ -181,7 +181,7 @@ export class JiraCloudProvider implements SprintProvider {
       events.push({ id: `${issue.key}-c${c.id}`, itemKey: issue.key, kind: "comment", at: new Date(c.created), actor: person(c.author), fromValue: null, toValue: null, body: adfToText(c.body ?? null) });
     }
     events.sort((a, b) => a.at.getTime() - b.at.getTime());
-    const lastActivityAt = events.reduce((m, e) => (e.at > m ? e.at : m), new Date(f.created));
+    const lastActivityAt = new Date(Math.max(new Date(f.created).getTime(), ...events.map((e) => e.at.getTime())));
     const allText = [description, ...comments.map((c) => adfToText(c.body ?? null))].join("\n");
     const sp = f[this.cfg.storyPointsField];
     const item: ProviderWorkItem = {
