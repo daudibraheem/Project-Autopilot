@@ -2,7 +2,8 @@ import { prisma } from "@autopilot/db";
 import { audit } from "../audit";
 import { getConfig } from "../config";
 import type { GoalId } from "../contract";
-import { GOAL_IDS } from "../contract";
+import { GOAL_IDS, isTeamGoal, TEAM_GOAL_IDS } from "../contract";
+import { s1StandupBriefReady, s2NoStuckWork } from "./team";
 import { g1NoCriticalVulns } from "./g1-no-critical-vulns";
 import { g2MainBuildGreen } from "./g2-main-build-green";
 import { g3SetupDocsWork } from "./g3-setup-docs-work";
@@ -18,7 +19,12 @@ export const GOALS: Record<GoalId, StandingGoal> = {
   "no-critical-vulns": g1NoCriticalVulns,
   "main-build-green": g2MainBuildGreen,
   "setup-docs-work": g3SetupDocsWork,
+  "standup-brief-ready": s1StandupBriefReady,
+  "no-stuck-work": s2NoStuckWork,
 };
+
+export { TEAM_GOAL_IDS };
+export const ALL_CHECKED_GOALS = [...GOAL_IDS, ...TEAM_GOAL_IDS] as const;
 
 export function mainSource(): GoalSource {
   return { kind: "ref", repo: getConfig().targetRepoPath, ref: "main" };
@@ -29,7 +35,7 @@ export async function checkGoal(goalId: GoalId, source: GoalSource = mainSource(
   const started = Date.now();
   try {
     const r = await GOALS[goalId].check(source);
-    return { ...r, durationMs: Date.now() - started, ref: sourceLabel(source) };
+    return { ...r, durationMs: Date.now() - started, ref: isTeamGoal(goalId) ? "sprint" : sourceLabel(source) };
   } catch (e) {
     return {
       goalId,
@@ -37,13 +43,13 @@ export async function checkGoal(goalId: GoalId, source: GoalSource = mainSource(
       summary: `Check errored: ${(e as Error).message}`,
       evidence: { error: String((e as Error).stack ?? e) },
       durationMs: Date.now() - started,
-      ref: sourceLabel(source),
+      ref: isTeamGoal(goalId) ? "sprint" : sourceLabel(source),
     };
   }
 }
 
 /** Check goals on main, store results, audit. */
-export async function runGoalChecks(goalIds: readonly GoalId[] = GOAL_IDS, reason = "manual"): Promise<GoalCheckResult[]> {
+export async function runGoalChecks(goalIds: readonly GoalId[] = ALL_CHECKED_GOALS, reason = "manual"): Promise<GoalCheckResult[]> {
   const results = await Promise.all(goalIds.map((g) => checkGoal(g)));
   for (const r of results) {
     await prisma.goalCheck.create({
@@ -70,12 +76,12 @@ export interface GoalOverview {
   history: { status: string; createdAt: Date }[];
 }
 
-export async function goalOverview(): Promise<GoalOverview[]> {
+export async function goalOverview(ids: readonly GoalId[] = GOAL_IDS): Promise<GoalOverview[]> {
   const since = weekWindowStart();
   const out: GoalOverview[] = [];
-  for (const id of GOAL_IDS) {
+  for (const id of ids) {
     const checks = await prisma.goalCheck.findMany({
-      where: { goalId: id, ref: "main" },
+      where: { goalId: id, ref: isTeamGoal(id) ? "sprint" : "main" },
       orderBy: { createdAt: "asc" },
       select: { status: true, summary: true, evidence: true, createdAt: true },
     });
