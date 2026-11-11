@@ -1,0 +1,9 @@
+{
+  "maxResults": 50,
+  "startAt": 0,
+  "isLast": true,
+  "values": [
+    { "id": 35, "state": "closed", "name": "TEST Sprint 3", "startDate": "2026-10-05T09:00:00.000Z", "endDate": "2026-10-19T17:00:00.000Z", "completeDate": "2026-10-19T16:00:00.000Z", "originBoardId": 12, "goal": "" },
+    { "id": 36, "state": "closed", "name": "TEST Sprint 4", "startDate": "2026-10-19T09:00:00.000Z", "endDate": "2026-11-02T17:00:00.000Z", "completeDate": "2026-11-02T16:30:00.000Z", "originBoardId": 12, "goal": "Tokenisation" }
+  ]
+}

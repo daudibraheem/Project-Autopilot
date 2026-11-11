@@ -1,0 +1,17 @@
+{
+  "maxResults": 50,
+  "startAt": 0,
+  "isLast": true,
+  "values": [
+    {
+      "id": 37,
+      "self": "https://example.atlassian.net/rest/agile/1.0/sprint/37",
+      "state": "active",
+      "name": "TEST Sprint 5",
+      "startDate": "2026-11-02T09:00:00.000Z",
+      "endDate": "2026-11-16T17:00:00.000Z",
+      "originBoardId": 12,
+      "goal": "Close the refunds epic"
+    }
+  ]
+}

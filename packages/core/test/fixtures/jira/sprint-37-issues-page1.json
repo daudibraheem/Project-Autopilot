@@ -1,0 +1,80 @@
+{
+  "expand": "schema,names",
+  "startAt": 0,
+  "maxResults": 2,
+  "total": 3,
+  "issues": [
+    {
+      "id": "10101",
+      "key": "TEST-11",
+      "fields": {
+        "summary": "Refund API endpoint",
+        "issuetype": { "name": "Story" },
+        "status": { "name": "In Progress", "statusCategory": { "key": "indeterminate", "name": "In Progress" } },
+        "assignee": { "accountId": "acc-1", "displayName": "Jamie Rivera" },
+        "labels": ["refunds"],
+        "created": "2026-10-30T10:00:00.000Z",
+        "updated": "2026-11-05T12:00:00.000Z",
+        "customfield_10016": 5,
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            { "type": "paragraph", "content": [{ "type": "text", "text": "Implements POST /refunds. Jamie Rivera owns the API." }] }
+          ]
+        },
+        "comment": {
+          "comments": [
+            {
+              "id": "20001",
+              "author": { "accountId": "acc-2", "displayName": "Sam Ortiz" },
+              "body": { "type": "doc", "version": 1, "content": [{ "type": "paragraph", "content": [{ "type": "text", "text": "Waiting on the schema review." }] }] },
+              "created": "2026-11-04T08:00:00.000Z"
+            }
+          ]
+        }
+      },
+      "changelog": {
+        "histories": [
+          {
+            "id": "30001",
+            "author": { "accountId": "acc-1", "displayName": "Jamie Rivera" },
+            "created": "2026-11-03T09:30:00.000Z",
+            "items": [{ "field": "status", "fromString": "To Do", "toString": "In Progress" }]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10102",
+      "key": "TEST-12",
+      "fields": {
+        "summary": "Hotfix: duplicate refund",
+        "issuetype": { "name": "Bug" },
+        "status": { "name": "In Review", "statusCategory": { "key": "indeterminate" } },
+        "assignee": null,
+        "labels": ["blocked"],
+        "created": "2026-11-01T10:00:00.000Z",
+        "customfield_10016": null,
+        "description": {
+          "type": "doc",
+          "version": 1,
+          "content": [
+            { "type": "paragraph", "content": [{ "type": "text", "text": "PR: " }, { "type": "inlineCard", "attrs": { "url": "https://github.com/acme/payments/pull/77" } }] }
+          ]
+        },
+        "comment": { "comments": [] }
+      },
+      "changelog": {
+        "histories": [
+          {
+            "id": "30002",
+            "author": { "accountId": "acc-2", "displayName": "Sam Ortiz" },
+            "created": "2026-11-06T11:00:00.000Z",
+            "items": [{ "field": "Sprint", "fromString": "", "toString": "TEST Sprint 5" }]
+          }
+        ]
+      }
+    }
+  ]
+}
