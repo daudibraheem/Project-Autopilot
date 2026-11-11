@@ -151,6 +151,16 @@ program
   });
 
 program
+  .command("demo-bad-brief")
+  .description("Scrum Mode: scripted worker that blames a person and miscounts; shows the gate and verifier blocking it")
+  .action(async () => {
+    const jobId = await createJob("standup-brief-ready", "demo-bad-brief", { enqueue: false });
+    console.log(`Running scripted bad brief as job ${jobId} …`);
+    await runJob(jobId);
+    await printJob(jobId);
+  });
+
+program
   .command("seed-sprint")
   .description("Scrum Mode: seed one active sprint (~20 items) with the planted situations (mock provider)")
   .action(async () => {
