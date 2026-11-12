@@ -20,6 +20,7 @@ import { commitWorkspace, prepareWorkspace, pushBranch, recentCommits, showCommi
 import { complete } from "./llm/gateway";
 import { routeModels } from "./llm/router";
 import { loadLessons, searchLessons } from "./lessons";
+import { skillForJobType, skillStamp } from "./skills";
 import { decide, failureRateFor, type FlakyDecision, loadFlakyModel, predictFlaky } from "./ml/flaky";
 import { FLAKY_SEEDS, parseTap, runAtRef, runInSandbox, TEST_COMMAND, testKey } from "./sandbox";
 import { parseCsv } from "./seed/ci-history";
@@ -266,6 +267,8 @@ export async function runJob(jobId: string): Promise<void> {
       }
 
       const prepared = await buildTask(job, contract, ws, baseline, rec, route);
+      const skill = skillForJobType(job.jobType);
+      if (skill) await rec.note("system", `Loaded skill: ${skillStamp(skill)} (matches job type ${job.jobType})`);
       const evidence: EvidenceItem[] = [];
       let step = 0;
       const addEvidence = (e: Omit<EvidenceItem, "step">) => evidence.push({ ...e, step: ++step });
@@ -283,7 +286,7 @@ export async function runJob(jobId: string): Promise<void> {
           model: route.workerModel,
           script: badWorker ? "bad-worker" : undefined,
           budget: contract,
-          initialMessages: [{ role: "user", content: renderTask(prepared.task, prepared.attachments) }],
+          initialMessages: [{ role: "user", content: renderTask(prepared.task, prepared.attachments, { skill }) }],
           resume: canResume ? (resumeStep!.checkpoint as unknown as Checkpoint) : undefined,
           promptVersion: WORKER_PROMPT(),
         },
