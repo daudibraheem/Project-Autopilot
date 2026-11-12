@@ -60,6 +60,7 @@ export interface Step {
   outputSummary: string | null;
   model: string | null;
   provider: string | null;
+  promptVersion: string | null;
   tokensIn: number;
   tokensOut: number;
   costUsd: number;

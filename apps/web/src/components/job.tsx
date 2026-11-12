@@ -97,6 +97,7 @@ export function Timeline({ steps }: { steps: Step[] }) {
                 <p className="text-xs text-muted">
                   {clock(s.createdAt)}
                   {s.provider && ` · ${s.provider}`}
+                  {s.promptVersion && ` · prompt ${s.promptVersion}`}
                   {s.hasCheckpoint && " · checkpoint saved"}
                 </p>
               </div>

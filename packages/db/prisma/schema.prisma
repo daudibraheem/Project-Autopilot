@@ -100,6 +100,7 @@ model JobStep {
   outputSummary String?  @db.Text
   model         String?
   provider      String?
+  promptVersion String? // versioned prompt stamp, e.g. "worker@1" (prompts/*.md)
   tokensIn      Int      @default(0)
   tokensOut     Int      @default(0)
   costUsd       Float    @default(0)

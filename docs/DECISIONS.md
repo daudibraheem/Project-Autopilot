@@ -57,3 +57,11 @@ A running log. Newest at the bottom.
 | S19 | At L1+ (earned), briefs auto-publish **to the dashboard only**. Nothing posts to Slack or Teams in this round. | The spec's publishing rule. |
 | S20 | `pnpm demo` also empties the sprint tables. | A clean state for both demos. |
 | S21 | Step recording, usage, status and lessons moved from `pipeline.ts` into `job-steps.ts`. | Lets the team pipeline reuse them without a circular import. |
+
+## Slide-coverage additions (BUILD_PROMPT §12)
+
+| # | Decision | Why |
+|---|---|---|
+| H1 | The worker, verifier, team-verifier, lesson-writer, assistant and sub-agent prompts live in `prompts/*.md`, each with a version header. `packages/core/src/prompts.ts` loads them (cached), strips the header, substitutes `{{…}}` placeholders, and exposes a `name@version` stamp. The old inline constants now load from these files. | One source of truth for prompt text, versionable in review. `prompts/**` is already a high-risk path, so agents can never edit them. |
+| H2 | The prompt stamp is recorded on every model step (`JobStep.promptVersion`, e.g. `worker@1`, `verifier@1`, `lesson-writer@1`, `team-verifier@1`) and shown on the job trace. | "Record the prompt version on every trace." |
+| H3 | The verifier prompt carries 3 labelled few-shot examples (pass, unsupported-claim fail, out-of-scope+injection fail); the worker prompt states a "plan, then act" style. Mock mode is unaffected (the mock verifier/worker are heuristic and ignore the system prompt). | Spec §H. Real models benefit; offline determinism is preserved. |

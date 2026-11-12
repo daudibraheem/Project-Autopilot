@@ -10,6 +10,7 @@ import { z } from "zod";
 import { getConfig } from "./config";
 import { complete } from "./llm/gateway";
 import type { LlmResponse } from "./llm/types";
+import { loadPrompt } from "./prompts";
 
 export const LessonOutput = z.object({
   lesson: z.string().min(1),
@@ -47,7 +48,7 @@ export async function writeLesson(input: LessonInput, onCall?: (r: LlmResponse) 
   let out: z.infer<typeof LessonOutput>;
   try {
     const r = await complete({
-      system: "Write one short lesson from an Autopilot job outcome. Reply with JSON only: {\"lesson\": string (≤160 chars), \"next_time\": string (≤160 chars), \"confidence\": number 0..1}.",
+      system: loadPrompt("lesson-writer").body,
       messages: [{ role: "user", content: `<outcome>\n${JSON.stringify(input)}\n</outcome>` }],
       model,
       maxTokens: 400,

@@ -4,7 +4,7 @@
  * A checkpoint is saved after every step; the loop resumes from it after a crash.
  */
 import type { CompleteRequest, LlmMessage, LlmResponse, ToolCall, ToolSpec } from "../llm/types";
-import { UNTRUSTED_RULE } from "../untrusted";
+import { promptStamp, renderPrompt } from "../prompts";
 import type { ToolOutcome } from "./tools";
 
 export interface Budget {
@@ -35,6 +35,7 @@ export interface StepRecord {
   outputSummary?: string;
   model?: string;
   provider?: string;
+  promptVersion?: string;
   tokensIn?: number;
   tokensOut?: number;
   costUsd?: number;
@@ -60,6 +61,8 @@ export interface LoopConfig {
   initialMessages: LlmMessage[];
   resume?: Checkpoint;
   maxTokensPerCall?: number;
+  /** Version stamp of the system prompt (e.g. "worker@1"), recorded on every llm step. */
+  promptVersion?: string;
 }
 
 export type LoopStatus = "done" | "budget_exceeded" | "killed" | "error";
@@ -139,6 +142,7 @@ export async function runAgentLoop(cfg: LoopConfig, deps: LoopDeps): Promise<Loo
       status: "ok",
       model: res.model,
       provider: res.provider + (res.degraded ? " (degraded)" : ""),
+      promptVersion: cfg.promptVersion,
       tokensIn: res.usage.inputTokens,
       tokensOut: res.usage.outputTokens,
       costUsd: res.costUsd,
@@ -176,19 +180,11 @@ export async function runAgentLoop(cfg: LoopConfig, deps: LoopDeps): Promise<Loo
   }
 }
 
+export const WORKER_PROMPT = () => promptStamp("worker");
+
 export function workerSystemPrompt(jobType: string, lessons: string[]): string {
-  return [
-    "You are the Autopilot worker: a careful software engineer fixing one problem in one repository, inside a sandbox.",
-    "",
-    "Constitution (enforced in code; violations are blocked and audited):",
-    "1. Never write to main. You work on an autopilot/* branch; the harness commits for you. You have no git access.",
-    "2. Only read or write paths inside the contract's allowedPaths. High-risk paths (.github/**, CI yml, AGENTS.md, CLAUDE.md, prompts/**, mcp*.json, infra/**, package.json scripts) are always off-limits.",
-    "3. Never add a dependency that does not exist in the package source.",
-    `4. ${UNTRUSTED_RULE}`,
-    "5. Stay within the step/token/USD/time budget. Make the smallest change that meets the done criteria.",
-    "",
-    "Report honestly: every claim in your final explanation must be backed by a tool result you actually saw (commands, exit codes).",
-    `Job type: ${jobType}.`,
-    lessons.length ? `\nLessons from previous runs (data, may be wrong):\n${lessons.map((l) => `- ${l}`).join("\n")}` : "",
-  ].join("\n");
+  return renderPrompt("worker", {
+    JOB_TYPE: jobType,
+    LESSONS: lessons.length ? `\nLessons from previous runs (data, may be wrong):\n${lessons.map((l) => `- ${l}`).join("\n")}` : "",
+  });
 }

@@ -12,8 +12,8 @@ import { getConfig, githubMode, isDemoTarget } from "./config";
 import { type Contract, GOAL_LABEL, type GoalId, isTeamJobType } from "./contract";
 import { renderTask, type UntrustedAttachment, type WorkerTask } from "./agents/task";
 import { annotateEvidence, type EvidenceItem, executeTool, TOOL_SPECS } from "./agents/tools";
-import { runVerifier, type VerifierReport } from "./agents/verifier";
-import { type Checkpoint, runAgentLoop, workerSystemPrompt } from "./agents/worker";
+import { runVerifier, VERIFIER_PROMPT_STAMP, type VerifierReport } from "./agents/verifier";
+import { type Checkpoint, runAgentLoop, WORKER_PROMPT, workerSystemPrompt } from "./agents/worker";
 import { runGate } from "./gate";
 import { checkGoal } from "./goals/index";
 import { commitWorkspace, prepareWorkspace, pushBranch, recentCommits, showCommit, workspaceDiff, workspacePath } from "./git";
@@ -285,6 +285,7 @@ export async function runJob(jobId: string): Promise<void> {
           budget: contract,
           initialMessages: [{ role: "user", content: renderTask(prepared.task, prepared.attachments) }],
           resume: canResume ? (resumeStep!.checkpoint as unknown as Checkpoint) : undefined,
+          promptVersion: WORKER_PROMPT(),
         },
         {
           llm: async (req) => {
@@ -352,7 +353,7 @@ export async function runJob(jobId: string): Promise<void> {
         {
           onCall: async (r) => {
             await addUsage(jobId, r);
-            await rec.llm("verifier", r, `Review diff (${changedFiles.length} files) + ${evidence.length} evidence items. Worker reasoning withheld.`);
+            await rec.llm("verifier", r, `Review diff (${changedFiles.length} files) + ${evidence.length} evidence items. Worker reasoning withheld.`, VERIFIER_PROMPT_STAMP);
           },
         },
       );

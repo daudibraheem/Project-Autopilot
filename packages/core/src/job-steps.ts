@@ -5,6 +5,7 @@ import { audit } from "./audit";
 import { Contract } from "./contract";
 import { writeLesson } from "./lessons";
 import type { LlmResponse } from "./llm/types";
+import { promptStamp } from "./prompts";
 
 export const TERMINAL_STATUSES = ["merged", "approved", "published", "rejected", "gate_failed", "failed", "budget_exceeded", "killed"];
 
@@ -34,6 +35,7 @@ export class StepRecorder {
         outputSummary: s.outputSummary ?? null,
         model: s.model ?? null,
         provider: s.provider ?? null,
+        promptVersion: s.promptVersion ?? null,
         tokensIn: s.tokensIn ?? 0,
         tokensOut: s.tokensOut ?? 0,
         costUsd: s.costUsd ?? 0,
@@ -42,12 +44,13 @@ export class StepRecorder {
       },
     });
   }
-  async llm(phase: string, r: LlmResponse, inputSummary: string) {
+  async llm(phase: string, r: LlmResponse, inputSummary: string, promptVersion?: string) {
     await this.record(phase, {
       kind: "llm",
       status: "ok",
       model: r.model,
       provider: r.provider + (r.degraded ? " (degraded)" : ""),
+      promptVersion,
       tokensIn: r.usage.inputTokens,
       tokensOut: r.usage.outputTokens,
       costUsd: r.costUsd,
@@ -119,7 +122,7 @@ export async function lessonFor(
     { jobId, jobType: job.jobType, goalId: job.goalId, result, evidence, failedGateChecks, verifierConcerns, highlights: highlights ?? [job.explanation?.slice(0, 200) ?? ""] },
     async (resp) => {
       await addUsage(jobId, resp);
-      await recorder.llm("lesson", resp, "Summarise the outcome into one lesson");
+      await recorder.llm("lesson", resp, "Summarise the outcome into one lesson", promptStamp("lesson-writer"));
     },
   );
   await recorder.note("lesson", out.duplicate ? `Lesson already known: ${out.lesson.lesson}` : `Lesson saved: ${out.lesson.lesson} · next time: ${out.lesson.nextTime}`);
