@@ -30,12 +30,13 @@ Point out:
 
 1. On the G1 panel, click **Run job**, then **View job →**.
 2. Watch the **step timeline** fill in live (it refreshes every 2 s):
-   - Harness: the baseline on main, run in a fresh sandbox.
-   - Worker: `read_file package.json` → `write_file package.json` (tinydate 1.0.0 → 2.0.0) → `run_tests`, which shows **1 new failure** in `test/due.test.js`.
-   - `read_file test/due.test.js` → `read_file src/due.js` → `write_file src/due.js` (`parse` → `parseDate`) → `run_tests`, which shows **0 new failures**.
-   - Verifier, on a **different model**: pass.
+   - Harness: the baseline on main, run in a fresh sandbox; **"Loaded skill: dependency-upgrade@1"**; **"Worker tools served over MCP"**.
+   - **"What the model saw"** stacked bar (context builder): goal+contract, AGENTS.md, skill, lessons, knowledge, tool results.
+   - Worker: `search_knowledge` (cites the upgrade runbook) → `read_file package.json` → `write_file package.json` (tinydate 1.0.0 → 2.0.0) → `run_tests`, which shows **1 new failure** in `test/due.test.js`.
+   - `read_file test/due.test.js` → `repo_map` (finds every call site of `parse`) → `read_file src/due.js` → `write_file src/due.js` (`parse` → `parseDate`) → `run_tests`, which shows **0 new failures**.
+   - Verifier, on a **different model**: pass, including `knowledge_citations_exist` (the cited runbook really exists).
    - Gate: **9/9 green**.
-3. Show the **Diff**, the **Contract** (allowed and forbidden paths, budget) and the **Evidence** (commands with exit codes).
+3. Show the **Diff**, the **Contract** (allowed and forbidden paths, budget), the **Codebase map** (`repo_map`) and the **Evidence** (commands with exit codes). The job header shows its **mode** (Coworker — you delegated it).
 4. Go to **Approvals** and click **Approve and merge**. Back on the **Overview**, G1 flashes and turns **green**.
 
 > "The worker never touched main. It worked on `autopilot/<jobId>` in its own clone. Only my approval merged it."
@@ -184,3 +185,21 @@ Open **Ask Autopilot** and click **"What's stuck and why?"**. The answer:
 - cites `[PAY-142]` and the others as clickable chips;
 - shows the MCP tool calls (`get_sprint → list_work_items → get_item_events`);
 - shows plain-code checks: citations exist and there is no judgement of people.
+
+---
+
+# Slide-coverage capabilities (BUILD_PROMPT §12)
+
+These are visible in the code demo above and summarised in `docs/SLIDE_COVERAGE.md`:
+
+- **Tools via MCP + tool poisoning (A):** the job trace says "Worker tools served over MCP". Run `AUTOPILOT_MCP_POISONED_TOOL=true pnpm cli run g1 --inline` to see the self-scan **refuse** a poisoned tool (Audit log → `mcp.tool_poisoning_detected`). `pnpm mcp-tools` starts the standalone read-only server.
+- **Knowledge base / RAG (B):** G1 calls `search_knowledge` and cites `docs/runbooks/…`; the verifier checks the citation exists.
+- **Context builder + management (C):** the job page "What the model saw" stacked bar; compaction fires on long jobs (`context.compacted`).
+- **Research sub-agent (D):** on G2, a nested "Research sub-agent" step reads past CI logs in its own context.
+- **Skills (E):** the trace shows the matching `SKILL.md` was loaded.
+- **Codebase map (F):** the job's "Codebase map" section; G1 lists every call site of `parse`.
+- **Assistant / Coworker / Ambient modes (G):** the ModesBar on Ask Autopilot and the mode badge on every job.
+- **Prompts as versioned files (H):** `prompts/*.md`; each trace step shows `prompt <name>@<version>`.
+- **Non-determinism in evals (I):** `pnpm eval` prints temperature, pass rate and a consistency score; `AUTOPILOT_EVAL_RUNS=3`.
+- **Every success becomes a check (J):** approve G1, then `pnpm cli seed --reintroduce g1` + "Check goals now" → the goal shows a **Regression** flag.
+- **Open-weight option (K):** `AUTOPILOT_LLM_PROVIDER=ollama` runs a local model (no key).
