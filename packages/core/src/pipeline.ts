@@ -11,7 +11,8 @@ import { audit } from "./audit";
 import { getConfig, githubMode, isDemoTarget } from "./config";
 import { type Contract, GOAL_LABEL, type GoalId, isTeamJobType } from "./contract";
 import { renderTask, type UntrustedAttachment, type WorkerTask } from "./agents/task";
-import { annotateEvidence, type EvidenceItem, executeTool, TOOL_SPECS } from "./agents/tools";
+import { annotateEvidence, type EvidenceItem } from "./agents/tools";
+import { connectWorkerTools } from "./agents/tools-mcp";
 import { runResearchSubAgent, SUBAGENT_PROMPT_STAMP } from "./agents/subagent";
 import { runVerifier, VERIFIER_PROMPT_STAMP, type VerifierReport } from "./agents/verifier";
 import { type Checkpoint, runAgentLoop, WORKER_PROMPT, workerSystemPrompt } from "./agents/worker";
@@ -312,10 +313,17 @@ export async function runJob(jobId: string): Promise<void> {
       }
       await prisma.job.update({ where: { id: jobId }, data: { analysis: { task: prepared.task } as object } });
 
+      // Worker tools are provided over MCP (in-process client ↔ server). A tool-poisoning self-scan
+      // runs at connect; policy.ts still checks every call inside executeTool (server-side).
+      const toolCtx = { jobId, ws, contract, baselineFailures: new Set(baseline), demoMode, searchLessons: (q: string) => searchLessons(q), searchKnowledge: (q: string) => searchKnowledge(q), addEvidence };
+      const mcp = await connectWorkerTools(toolCtx, { includePoisoned: cfg.mcpPoisonedTool, jobId });
+      for (const r of mcp.refused) await rec.note("system", `MCP tool-poisoning self-scan REFUSED tool "${r.tool}": ${r.reasons.join("; ")}. It was not offered to the model.`, "error");
+      await rec.note("system", `Worker tools served over MCP (in-process client): ${mcp.tools.map((t) => t.name).join(", ")}${mcp.refused.length ? ` · refused ${mcp.refused.length}` : ""}`);
+
       const result = await runAgentLoop(
         {
           system: workerSystem,
-          tools: TOOL_SPECS,
+          tools: mcp.tools,
           model: route.workerModel,
           script: badWorker ? "bad-worker" : undefined,
           budget: contract,
@@ -333,10 +341,7 @@ export async function runJob(jobId: string): Promise<void> {
             return r;
           },
           exec: async (call) => {
-            const out = await executeTool(
-              { jobId, ws, contract, baselineFailures: new Set(baseline), demoMode, searchLessons: (q) => searchLessons(q), searchKnowledge: (q) => searchKnowledge(q), addEvidence },
-              call,
-            );
+            const out = await mcp.exec(call);
             await prisma.job.update({
               where: { id: jobId },
               data: { evidence: evidence as unknown as object, ...(out.repoMap ? { analysis: { task: prepared.task, repoMap: out.repoMap } as object } : {}) },
@@ -350,6 +355,7 @@ export async function runJob(jobId: string): Promise<void> {
           },
         },
       );
+      await mcp.close();
       await prisma.job.update({ where: { id: jobId }, data: { stepsUsed: result.usage.steps, evidence: annotateEvidence(evidence) as unknown as object, ...(result.degraded ? { degraded: true } : {}) } });
 
       if (result.status !== "done") {

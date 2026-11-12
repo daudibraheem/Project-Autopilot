@@ -41,6 +41,7 @@ export interface AutopilotConfig {
   sandboxImage: string;
   contextWindow: number;
   compactAtFraction: number;
+  mcpPoisonedTool: boolean;
 }
 
 /** Read config fresh each time so tests / CLI flags can change env between calls. */
@@ -64,6 +65,7 @@ export function getConfig(): AutopilotConfig {
     sandboxImage: env("AUTOPILOT_SANDBOX_IMAGE", "node:22-slim"),
     contextWindow: Number(env("AUTOPILOT_CONTEXT_WINDOW", "200000")) || 200_000,
     compactAtFraction: Number(env("AUTOPILOT_COMPACT_AT", "0.6")) || 0.6,
+    mcpPoisonedTool: env("AUTOPILOT_MCP_POISONED_TOOL", "false") === "true",
   };
 }
 
