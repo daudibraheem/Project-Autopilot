@@ -19,7 +19,8 @@ import { checkGoal } from "./goals/index";
 import { commitWorkspace, prepareWorkspace, pushBranch, recentCommits, showCommit, workspaceDiff, workspacePath } from "./git";
 import { complete } from "./llm/gateway";
 import { routeModels } from "./llm/router";
-import { knowledgeCitationsIn, knowledgePathsExist, searchKnowledge } from "./knowledge";
+import { buildWorkerContext } from "./context/builder";
+import { type KnowledgeHit, knowledgeCitationsIn, knowledgePathsExist, searchKnowledge } from "./knowledge";
 import { loadLessons, searchLessons } from "./lessons";
 import { skillForJobType, skillStamp } from "./skills";
 import { decide, failureRateFor, type FlakyDecision, loadFlakyModel, predictFlaky } from "./ml/flaky";
@@ -47,6 +48,7 @@ interface PreparedTask {
   task: WorkerTask;
   attachments: UntrustedAttachment[];
   evidence: Omit<EvidenceItem, "step">[];
+  knowledge: KnowledgeHit[];
 }
 
 async function latestGoalEvidence(goalId: GoalId) {
@@ -202,7 +204,9 @@ async function buildTask(
       text: JSON.stringify({ summary: goal.summary, failedStep: idx, failedCommand: failed?.command ?? null, output: failed?.output ?? "" }, null, 2),
     });
   }
-  return { task, attachments, evidence };
+  // Pre-retrieve one relevant knowledge passage for the assembled context (RAG in the context, not only as a tool).
+  const knowledge = await searchKnowledge(`${job.jobType.replace(/-/g, " ")} ${goal.summary}`, 1);
+  return { task, attachments, evidence, knowledge };
 }
 
 // ---------------- main entry ----------------
@@ -270,6 +274,19 @@ export async function runJob(jobId: string): Promise<void> {
       const prepared = await buildTask(job, contract, ws, baseline, rec, route);
       const skill = skillForJobType(job.jobType);
       if (skill) await rec.note("system", `Loaded skill: ${skillStamp(skill)} (matches job type ${job.jobType})`);
+      const workerSystem = workerSystemPrompt(job.jobType, []); // lessons move into the assembled context
+      const built = buildWorkerContext({
+        system: workerSystem,
+        task: prepared.task,
+        attachments: prepared.attachments,
+        skill,
+        lessons: prepared.task.lessons,
+        knowledge: prepared.knowledge,
+      });
+      await rec.note(
+        "system",
+        `Context assembled (one task per session; fresh context, lessons carried over). What the model saw: ${built.sections.map((s) => `${s.label} ${s.tokens} tok`).join(" · ")} · total ~${built.totalTokens} tok`,
+      );
       const evidence: EvidenceItem[] = [];
       let step = 0;
       const addEvidence = (e: Omit<EvidenceItem, "step">) => evidence.push({ ...e, step: ++step });
@@ -282,14 +299,17 @@ export async function runJob(jobId: string): Promise<void> {
 
       const result = await runAgentLoop(
         {
-          system: workerSystemPrompt(job.jobType, prepared.task.lessons),
+          system: workerSystem,
           tools: TOOL_SPECS,
           model: route.workerModel,
           script: badWorker ? "bad-worker" : undefined,
           budget: contract,
-          initialMessages: [{ role: "user", content: renderTask(prepared.task, prepared.attachments, { skill }) }],
+          initialMessages: [{ role: "user", content: built.userMessage }],
           resume: canResume ? (resumeStep!.checkpoint as unknown as Checkpoint) : undefined,
           promptVersion: WORKER_PROMPT(),
+          contextBreakdown: built.sections,
+          modelWindow: cfg.contextWindow,
+          compactAtFraction: cfg.compactAtFraction,
         },
         {
           llm: async (req) => {
@@ -310,6 +330,9 @@ export async function runJob(jobId: string): Promise<void> {
           },
           record: (s) => rec.record("worker", s),
           shouldStop: async () => ((await isKillSwitchOn()) ? "Kill switch is on" : null),
+          onCompaction: async (info) => {
+            await audit({ actor: "worker", action: "context.compacted", target: jobId, jobId, details: info });
+          },
         },
       );
       await prisma.job.update({ where: { id: jobId }, data: { stepsUsed: result.usage.steps, evidence: annotateEvidence(evidence) as unknown as object, ...(result.degraded ? { degraded: true } : {}) } });

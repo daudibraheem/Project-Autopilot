@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { use } from "react";
 import { ApprovalActions } from "@/components/ApprovalActions";
-import { ContractView, Diff, EvidenceList, GateChecklist, RepoMapView, Timeline, VerifierView } from "@/components/job";
+import { ContextBar, ContractView, Diff, EvidenceList, GateChecklist, RepoMapView, Timeline, VerifierView } from "@/components/job";
 import { BriefView, Counts, NudgeCard } from "@/components/team";
 import { ErrorNote, JobStatus, Loading, Mono, Section } from "@/components/ui";
 import { dateTime, usd } from "@/lib/format";
@@ -93,6 +93,14 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
               {job.feedback && <p className="mt-3 text-sm text-muted">Reviewer feedback for this attempt: “{job.feedback}”</p>}
             </Section>
           )}
+          {(() => {
+            const ctx = job.steps.find((s) => s.context && s.context.length > 0)?.context;
+            return ctx ? (
+              <Section title="What the model saw" aside="Context builder · tokens per section">
+                <ContextBar sections={ctx} />
+              </Section>
+            ) : null;
+          })()}
           <Section title="Step timeline" aside={["running", "verifying", "gating", "queued"].includes(job.status) ? "Live · refreshes every 2 s" : `${job.steps.length} steps`}>
             <Timeline steps={job.steps} />
           </Section>

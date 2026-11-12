@@ -1,8 +1,45 @@
 "use client";
 import { useState } from "react";
 import { clock, ms, usd } from "@/lib/format";
-import type { Evidence, JobDetail, RepoMap, Step } from "@/lib/types";
+import type { ContextSection, Evidence, JobDetail, RepoMap, Step } from "@/lib/types";
 import { Check, cx, Empty, Mono } from "./ui";
+
+/** "What the model saw": a stacked bar of per-section token counts in the assembled context. */
+const CONTEXT_COLORS: Record<string, string> = {
+  system_prompt: "bg-accent",
+  goal_contract: "bg-ok",
+  agents_md: "bg-warn",
+  skill: "bg-[color-mix(in_oklab,var(--accent),white_35%)]",
+  lessons: "bg-[color-mix(in_oklab,var(--ok),black_20%)]",
+  knowledge: "bg-[color-mix(in_oklab,var(--warn),black_25%)]",
+  tool_results: "bg-muted",
+  instructions: "bg-line",
+};
+
+export function ContextBar({ sections }: { sections: ContextSection[] }) {
+  const total = sections.reduce((n, s) => n + s.tokens, 0) || 1;
+  return (
+    <div className="space-y-3">
+      <div className="flex h-3 w-full overflow-hidden rounded-full">
+        {sections.map((s) => (
+          <div key={s.name} className={cx("h-full", CONTEXT_COLORS[s.name] ?? "bg-muted")} style={{ width: `${(s.tokens / total) * 100}%` }} title={`${s.label}: ${s.tokens} tok`} />
+        ))}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        {sections.map((s) => (
+          <li key={s.name} className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5">
+              <span className={cx("inline-block h-2.5 w-2.5 rounded-sm", CONTEXT_COLORS[s.name] ?? "bg-muted")} />
+              {s.label}
+            </span>
+            <span className="tabular-nums text-muted">{s.tokens} tok</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-muted">Total ~{total} tokens. One task per session: a fresh context each job; only lessons carry over.</p>
+    </div>
+  );
+}
 
 /** Codebase map (repo_map tool): files with exports/imports, and call sites of the mapped symbol. */
 export function RepoMapView({ map }: { map: RepoMap }) {

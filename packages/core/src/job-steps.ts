@@ -41,6 +41,7 @@ export class StepRecorder {
         costUsd: s.costUsd ?? 0,
         durationMs: s.durationMs ?? 0,
         checkpoint: s.checkpoint ? (JSON.parse(JSON.stringify(s.checkpoint)) as object) : undefined,
+        context: s.context ? (JSON.parse(JSON.stringify(s.context)) as object) : undefined,
       },
     });
   }

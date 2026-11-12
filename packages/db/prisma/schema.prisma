@@ -106,6 +106,7 @@ model JobStep {
   costUsd       Float    @default(0)
   durationMs    Int      @default(0)
   checkpoint    Json?
+  context       Json? // "what the model saw": per-section token breakdown (first model step)
   createdAt     DateTime @default(now())
 
   @@index([jobId, attempt, index])

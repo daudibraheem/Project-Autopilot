@@ -39,6 +39,8 @@ export interface AutopilotConfig {
   githubRepo: string;
   sandbox: SandboxMode;
   sandboxImage: string;
+  contextWindow: number;
+  compactAtFraction: number;
 }
 
 /** Read config fresh each time so tests / CLI flags can change env between calls. */
@@ -60,6 +62,8 @@ export function getConfig(): AutopilotConfig {
     githubRepo: env("GITHUB_REPO"),
     sandbox: (env("AUTOPILOT_SANDBOX", "auto") as SandboxMode) || "auto",
     sandboxImage: env("AUTOPILOT_SANDBOX_IMAGE", "node:22-slim"),
+    contextWindow: Number(env("AUTOPILOT_CONTEXT_WINDOW", "200000")) || 200_000,
+    compactAtFraction: Number(env("AUTOPILOT_COMPACT_AT", "0.6")) || 0.6,
   };
 }
 

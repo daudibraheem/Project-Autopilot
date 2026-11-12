@@ -66,7 +66,15 @@ export interface Step {
   costUsd: number;
   durationMs: number;
   hasCheckpoint: boolean;
+  context: ContextSection[] | null;
   createdAt: string;
+}
+
+export interface ContextSection {
+  name: string;
+  label: string;
+  chars: number;
+  tokens: number;
 }
 
 export interface Evidence {
