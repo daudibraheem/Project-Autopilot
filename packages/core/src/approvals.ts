@@ -82,6 +82,9 @@ export async function approveJob(jobId: string, actor: "human" | "system" = "hum
   }
   const t = await recordTrust(job.jobType, "approved", jobId, note ?? "approved by human");
   await lesson(jobId, "pass", `gate all green; approved by ${actor}${note ? `: ${note}` : ""}`);
+  // Every success becomes a check: save this approved fix's doneCriteria as a regression check.
+  const { saveRegressionCheck } = await import("./regression");
+  await saveRegressionCheck(jobId);
   if (status === "merged") await afterMerge(`after merge of ${jobId}`);
   return { status, trustChange: t.change };
 }

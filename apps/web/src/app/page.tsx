@@ -104,6 +104,11 @@ function GoalPanel({ g, openJob, onRun, killSwitch }: { g: GoalView; openJob?: {
       </div>
 
       <div className="min-w-0">
+        {g.regressed && (
+          <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-warn-bg px-2.5 py-0.5 text-xs font-medium text-warn" title="A previously-approved fix no longer passes its saved regression check.">
+            Regression · an approved fix broke
+          </p>
+        )}
         <p className="text-sm">{g.latest?.summary ?? "Not checked yet. Use “Check goals now”."}</p>
         {lines.length > 0 && (
           <ul className="mt-3 space-y-1 rounded-lg bg-surface-2 px-3 py-2.5 font-mono text-xs text-muted">

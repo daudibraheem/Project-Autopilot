@@ -246,6 +246,22 @@ model MlPrediction {
   @@index([createdAt])
 }
 
+/// "Every success becomes a check": the doneCriteria of an approved job, re-run on every goal run.
+/// A failing regression flags its goal (amber). One active check per goal (the latest approved fix).
+model RegressionCheck {
+  id            String    @id @default(cuid())
+  goalId        String    @unique
+  jobType       String
+  jobId         String
+  criteria      Json // doneCriteria descriptions captured at approval
+  active        Boolean   @default(true)
+  lastStatus    String    @default("pass") // pass | fail
+  lastCheckedAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([active])
+}
+
 /// Knowledge base (RAG): runbook passages indexed with Postgres full-text search (tsv column).
 /// Default offline search is FTS; pgvector embeddings are an optional extra when a provider key is set.
 model KnowledgeDoc {

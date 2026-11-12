@@ -111,6 +111,7 @@ export function memoryDb() {
     standupBrief: table(),
     nudgeDraft: table(),
     goalCheck: table(),
+    regressionCheck: table("goalId"),
     job: table(),
     trustRecord: table("jobType"),
     trustEvent: table(),

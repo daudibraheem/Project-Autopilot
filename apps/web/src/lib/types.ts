@@ -20,6 +20,7 @@ export interface GoalView {
   previousStatus: string | null;
   hoursBrokenWeek: number;
   history: { status: string; createdAt: string }[];
+  regressed: boolean;
 }
 
 export interface Overview extends SystemInfo {
