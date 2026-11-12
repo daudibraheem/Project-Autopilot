@@ -59,14 +59,16 @@ If port 5432 is already in use, set `AUTOPILOT_DB_PORT` and `DATABASE_URL` in `.
 
 | | Mock (default) | Real |
 |---|---|---|
-| `AUTOPILOT_LLM_PROVIDER` | `mock` | `anthropic` or `openai` |
-| Keys | none | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` |
+| `AUTOPILOT_LLM_PROVIDER` | `mock` | `anthropic`, `openai`, or `ollama` (local open-weight) |
+| Keys | none | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (none for `ollama`) |
 | Worker / verifier | Scripted, deterministic models that drive the real loop, tools, policy, sandbox and git | `WORKER_MODEL` / `VERIFIER_MODEL` (or `OPENAI_*`) |
 | Cost figures | Estimated from the pinned model's prices (characters ÷ 4) | From provider-reported token usage |
 
 - **Model routing:** easy contracts use `WORKER_MODEL`; hard ones use `HARD_WORKER_MODEL`. The router throws a config error if the verifier model equals the worker model for a job.
 - **Retries:** transient errors are retried with backoff. Set `AUTOPILOT_ALLOW_MOCK_FALLBACK=true` to fall back to mock after repeated failures; such jobs are marked **degraded**.
 - **Pointing at another repo:** set `TARGET_REPO_PATH` to any local Node repo. Without `advisories.json` and `vendor/`, real mode uses the **OSV API** for advisories and the **npm registry** for the package-existence check. `pnpm cli seed` refuses to overwrite a directory that isn't a seeded demo repo.
+- **Open-weight / local option:** set `AUTOPILOT_LLM_PROVIDER=ollama` (no key) to run a local model through [Ollama](https://ollama.com) via its `/api/chat` endpoint (`OLLAMA_WORKER_MODEL`, `OLLAMA_VERIFIER_MODEL`). This shows the closed-vs-open hosting trade-off; the same router rule (verifier ≠ worker) applies.
+- **Temperature & non-determinism:** `AUTOPILOT_TEMPERATURE` (default 0) is passed to the provider and recorded on every trace. `pnpm eval` repeats each case `AUTOPILOT_EVAL_RUNS` times (mock 1, real 3) and reports a pass rate and a consistency score.
 
 ## GitHub mode (optional)
 

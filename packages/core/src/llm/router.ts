@@ -18,6 +18,9 @@ export function routeModels(difficulty: "easy" | "hard", cfg: AutopilotConfig = 
   if (cfg.provider === "openai") {
     workerModel = cfg.openaiWorkerModel;
     verifierModel = cfg.openaiVerifierModel;
+  } else if (cfg.provider === "ollama") {
+    workerModel = cfg.ollamaWorkerModel;
+    verifierModel = cfg.ollamaVerifierModel;
   } else {
     workerModel = difficulty === "hard" ? cfg.hardWorkerModel : cfg.workerModel;
     verifierModel = cfg.verifierModel;

@@ -6,6 +6,7 @@
 import { getConfig, type LlmProviderName } from "../config";
 import { AnthropicProvider } from "./anthropic";
 import { MockProvider } from "./mock";
+import { OllamaProvider } from "./ollama";
 import { OpenAIProvider } from "./openai";
 import { estimateUsd } from "./pricing";
 import { type CompleteRequest, type LlmProvider, type LlmResponse, TransientLlmError } from "./types";
@@ -15,7 +16,7 @@ const providers = new Map<LlmProviderName, LlmProvider>();
 export function getProvider(name: LlmProviderName = getConfig().provider): LlmProvider {
   let p = providers.get(name);
   if (!p) {
-    p = name === "anthropic" ? new AnthropicProvider() : name === "openai" ? new OpenAIProvider() : new MockProvider();
+    p = name === "anthropic" ? new AnthropicProvider() : name === "openai" ? new OpenAIProvider() : name === "ollama" ? new OllamaProvider() : new MockProvider();
     providers.set(name, p);
   }
   return p;

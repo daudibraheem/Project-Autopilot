@@ -56,7 +56,7 @@ export interface LlmResponse extends ProviderResponse {
 }
 
 export interface LlmProvider {
-  readonly name: "mock" | "anthropic" | "openai";
+  readonly name: "mock" | "anthropic" | "openai" | "ollama";
   complete(req: CompleteRequest): Promise<ProviderResponse>;
 }
 
