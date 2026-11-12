@@ -12,6 +12,7 @@ import { getConfig, githubMode, isDemoTarget } from "./config";
 import { type Contract, GOAL_LABEL, type GoalId, isTeamJobType } from "./contract";
 import { renderTask, type UntrustedAttachment, type WorkerTask } from "./agents/task";
 import { annotateEvidence, type EvidenceItem, executeTool, TOOL_SPECS } from "./agents/tools";
+import { runResearchSubAgent, SUBAGENT_PROMPT_STAMP } from "./agents/subagent";
 import { runVerifier, VERIFIER_PROMPT_STAMP, type VerifierReport } from "./agents/verifier";
 import { type Checkpoint, runAgentLoop, WORKER_PROMPT, workerSystemPrompt } from "./agents/worker";
 import { runGate } from "./gate";
@@ -172,6 +173,20 @@ async function buildTask(
           ? { quarantineReason: `quarantined by Autopilot job ${job.id}: flaky (p=${primary.p.toFixed(2)}, passed on re-run); fix tracked separately` }
           : {}),
       };
+
+      // Research sub-agent: read up to 40 past CI logs for this test in its OWN context; return ≤5 findings.
+      const ciLogs = rows
+        .filter((r) => r.test_file === primary!.f.file)
+        .slice(-40)
+        .map((r) => `run ${r.run_id} @ ${r.timestamp} commit ${r.commit} failed=${r.failed} rerun_passed=${r.rerun_passed} files_changed=${r.files_changed} test_touched=${r.test_file_touched} label=${r.label || "?"}`);
+      if (ciLogs.length) {
+        const research = await runResearchSubAgent({ test: { file: primary.f.file, name: primary.f.name }, logs: ciLogs, model: route.workerModel }, async (r) => {
+          await addUsage(job.id, r);
+          await rec.llm("subagent", r, `Research sub-agent: read ${ciLogs.length} past CI run(s) for ${primary!.f.file} in its own, separate context`, SUBAGENT_PROMPT_STAMP);
+        });
+        task.research = research.findings;
+        await rec.note("subagent", `Research sub-agent returned ${research.findings.length} finding(s): ${research.findings.map((f) => f.summary).join(" | ")}`);
+      }
       if (decision === "real_bug") {
         // Find the cause commit: newest commit whose parent still passes the failing test (bounded bisect, max 4 runs).
         const commits = (await recentCommits(cfg.targetRepoPath, "main", 6)).filter((c) => c.files.some((f) => !f.startsWith("test/")));

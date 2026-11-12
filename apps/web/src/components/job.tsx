@@ -116,6 +116,7 @@ export function Diff({ diff }: { diff: string | null }) {
 const PHASE_LABEL: Record<string, string> = {
   worker: "Worker",
   classifier: "Classifier",
+  subagent: "Research sub-agent",
   verifier: "Verifier",
   gate: "Gate",
   lesson: "Lesson",
@@ -137,7 +138,14 @@ export function Timeline({ steps }: { steps: Step[] }) {
       {steps.map((s) => {
         const isOpen = open[s.id] ?? (s.status === "denied" || (s.kind === "note" && s.phase === "gate"));
         return (
-          <li key={s.id} className={cx("rounded-lg border", s.status === "denied" ? "border-bad/40 bg-bad-bg/60" : s.status === "error" ? "border-warn/40" : "border-transparent hover:border-line")}>
+          <li
+            key={s.id}
+            className={cx(
+              "rounded-lg border",
+              s.phase === "subagent" && "ml-6 border-l-2 border-l-accent/40",
+              s.status === "denied" ? "border-bad/40 bg-bad-bg/60" : s.status === "error" ? "border-warn/40" : "border-transparent hover:border-line",
+            )}
+          >
             <button type="button" className="flex w-full items-start gap-3 px-3 py-2 text-left" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [s.id]: !isOpen })}>
               <span className="w-7 shrink-0 pt-0.5 text-right font-mono text-xs text-muted">{s.index}</span>
               <span

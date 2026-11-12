@@ -34,6 +34,8 @@ export interface WorkerTask {
   };
   feedback?: string;
   lessons: string[];
+  /** Findings from the research sub-agent (G2 CI-log analysis), returned to the worker. */
+  research?: { summary: string; evidence: string }[];
 }
 
 export interface UntrustedAttachment {

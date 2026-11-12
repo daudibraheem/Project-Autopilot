@@ -429,6 +429,34 @@ function lessonResponse(req: CompleteRequest): string {
   return JSON.stringify({ lesson, next_time: nextTime, confidence: 0.85 });
 }
 
+/** Research sub-agent (G2): summarise CI logs into up to 5 findings (deterministic, offline). */
+function researchResponse(req: CompleteRequest): string {
+  const msg = req.messages.find((m) => m.role === "user")?.content ?? "";
+  const logs = Object.values(untrustedBlocks(msg)).join("\n").split("\n").filter(Boolean);
+  const failed = logs.filter((l) => /\bfailed=1\b/.test(l));
+  const rerunPassed = failed.filter((l) => /\brerun_passed=1\b/.test(l));
+  const touched = failed.filter((l) => /\btest_touched=1\b/.test(l));
+  const runIds = (ls: string[]) => ls.map((l) => /run (\d+)/.exec(l)?.[1]).filter(Boolean).slice(0, 5).join(", ");
+  const findings: { summary: string; evidence: string }[] = [];
+  findings.push({ summary: `Failed in ${failed.length} of ${logs.length} reviewed CI logs.`, evidence: failed.length ? `runs ${runIds(failed)}` : "no failures in the window" });
+  if (failed.length) {
+    findings.push({
+      summary:
+        rerunPassed.length === failed.length
+          ? `All ${failed.length} failures passed on a plain re-run (flaky signal).`
+          : rerunPassed.length === 0
+            ? `No failures passed on re-run (deterministic / real-bug signal).`
+            : `${rerunPassed.length} of ${failed.length} failures passed on re-run.`,
+      evidence: `rerun_passed=1 in ${rerunPassed.length} failing run(s)`,
+    });
+    findings.push({
+      summary: touched.length ? `${touched.length} failure(s) coincided with a change to the test file.` : "No failure coincided with a change to the test file.",
+      evidence: `test_touched=1 in ${touched.length} failing run(s)`,
+    });
+  }
+  return JSON.stringify({ findings: findings.slice(0, 5) });
+}
+
 function analysisResponse(req: CompleteRequest): string {
   const msg = req.messages.find((m) => m.role === "user")?.content ?? "";
   const logs = Object.values(untrustedBlocks(msg)).join("\n");
@@ -457,7 +485,7 @@ export class MockProvider implements LlmProvider {
         text = lessonResponse(req);
         break;
       case "analysis":
-        text = analysisResponse(req);
+        text = req.script === "research-subagent" ? researchResponse(req) : analysisResponse(req);
         break;
     }
     const inputText = (req.system ?? "") + JSON.stringify(req.messages) + JSON.stringify(req.tools ?? []);
