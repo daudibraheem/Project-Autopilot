@@ -63,6 +63,7 @@ describe("context compaction (§12 C)", () => {
         latencyMs: 1,
         degraded: false,
         attempts: 1,
+      temperature: 0,
       };
     };
     const bigToolResult = "X".repeat(400);

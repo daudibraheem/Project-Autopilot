@@ -54,6 +54,7 @@ export class AnthropicProvider implements LlmProvider {
       res = await this.client.messages.create({
         model: req.model,
         max_tokens: req.maxTokens,
+        ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
         ...(req.system ? { system: req.system } : {}),
         messages: toAnthropicMessages(req),
         ...(req.tools?.length

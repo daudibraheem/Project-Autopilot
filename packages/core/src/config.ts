@@ -42,6 +42,8 @@ export interface AutopilotConfig {
   contextWindow: number;
   compactAtFraction: number;
   mcpPoisonedTool: boolean;
+  temperature: number;
+  evalRuns: number;
 }
 
 /** Read config fresh each time so tests / CLI flags can change env between calls. */
@@ -66,6 +68,9 @@ export function getConfig(): AutopilotConfig {
     contextWindow: Number(env("AUTOPILOT_CONTEXT_WINDOW", "200000")) || 200_000,
     compactAtFraction: Number(env("AUTOPILOT_COMPACT_AT", "0.6")) || 0.6,
     mcpPoisonedTool: env("AUTOPILOT_MCP_POISONED_TOOL", "false") === "true",
+    temperature: Number(env("AUTOPILOT_TEMPERATURE", "0")) || 0,
+    // Eval repeats per case (non-determinism). Mock is deterministic → default 1; real providers → 3.
+    evalRuns: Number(env("AUTOPILOT_EVAL_RUNS", provider === "mock" ? "1" : "3")) || 1,
   };
 }
 

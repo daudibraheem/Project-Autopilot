@@ -24,6 +24,8 @@ export interface CompleteRequest {
   model: string;
   maxTokens: number;
   purpose: LlmPurpose;
+  /** Sampling temperature (0 = deterministic). Configurable; recorded on the trace. */
+  temperature?: number;
   /** Scenario key for the mock provider (job type or a scripted demo like "bad-worker"). */
   script?: string;
 }
@@ -50,6 +52,7 @@ export interface LlmResponse extends ProviderResponse {
   latencyMs: number;
   degraded: boolean;
   attempts: number;
+  temperature: number;
 }
 
 export interface LlmProvider {

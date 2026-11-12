@@ -44,6 +44,8 @@ export async function complete(req: CompleteRequest, opts: GatewayOptions = {}):
   const maxAttempts = opts.maxAttempts ?? 3;
   const baseDelay = opts.baseDelayMs ?? 800;
   const started = Date.now();
+  const temperature = req.temperature ?? cfg.temperature;
+  req = { ...req, temperature };
   await opts.beforeSend?.(req);
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -57,6 +59,7 @@ export async function complete(req: CompleteRequest, opts: GatewayOptions = {}):
         latencyMs: Date.now() - started,
         degraded: false,
         attempts: attempt,
+        temperature,
       };
     } catch (e) {
       lastErr = e;
@@ -75,6 +78,7 @@ export async function complete(req: CompleteRequest, opts: GatewayOptions = {}):
       latencyMs: Date.now() - started,
       degraded: true,
       attempts: maxAttempts,
+      temperature,
     };
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));

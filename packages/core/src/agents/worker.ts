@@ -38,6 +38,7 @@ export interface StepRecord {
   model?: string;
   provider?: string;
   promptVersion?: string;
+  temperature?: number;
   tokensIn?: number;
   tokensOut?: number;
   costUsd?: number;
@@ -193,6 +194,7 @@ export async function runAgentLoop(cfg: LoopConfig, deps: LoopDeps): Promise<Loo
       model: res.model,
       provider: res.provider + (res.degraded ? " (degraded)" : ""),
       promptVersion: cfg.promptVersion,
+      temperature: res.temperature,
       tokensIn: res.usage.inputTokens,
       tokensOut: res.usage.outputTokens,
       costUsd: res.costUsd,

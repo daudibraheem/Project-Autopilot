@@ -101,6 +101,7 @@ model JobStep {
   model         String?
   provider      String?
   promptVersion String? // versioned prompt stamp, e.g. "worker@1" (prompts/*.md)
+  temperature   Float? // sampling temperature used for this model call
   tokensIn      Int      @default(0)
   tokensOut     Int      @default(0)
   costUsd       Float    @default(0)

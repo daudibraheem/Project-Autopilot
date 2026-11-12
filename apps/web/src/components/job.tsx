@@ -181,6 +181,7 @@ export function Timeline({ steps }: { steps: Step[] }) {
                   {clock(s.createdAt)}
                   {s.provider && ` · ${s.provider}`}
                   {s.promptVersion && ` · prompt ${s.promptVersion}`}
+                  {s.kind === "llm" && s.temperature !== null && ` · temp ${s.temperature}`}
                   {s.hasCheckpoint && " · checkpoint saved"}
                 </p>
               </div>

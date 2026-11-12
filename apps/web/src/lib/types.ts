@@ -61,6 +61,7 @@ export interface Step {
   model: string | null;
   provider: string | null;
   promptVersion: string | null;
+  temperature: number | null;
   tokensIn: number;
   tokensOut: number;
   costUsd: number;

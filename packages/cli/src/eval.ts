@@ -52,35 +52,64 @@ export function writePromptfooFiles(): string {
   return dir;
 }
 
+interface EvalCaseStat {
+  id: string;
+  passes: number;
+  runs: number;
+  majorityVerdict: string;
+  consistency: number; // fraction of runs agreeing on the majority verdict
+  passed: boolean; // passed on a majority of runs
+}
+
+/** Run one eval case `runs` times; report pass rate and a consistency score (verdict agreement). */
+async function evalCase(id: string, runs: number, expected: string, mustFail: string | undefined, run: () => Promise<{ verdict: string; checks: { name: string; passed: boolean; reason: string }[] }>): Promise<EvalCaseStat> {
+  const verdicts: string[] = [];
+  let passes = 0;
+  let lastChecks: { name: string; passed: boolean; reason: string }[] = [];
+  for (let i = 0; i < runs; i++) {
+    const report = await run();
+    lastChecks = report.checks;
+    const ok = report.verdict === expected && (!mustFail || report.checks.some((k) => k.name === mustFail && !k.passed));
+    if (ok) passes++;
+    verdicts.push(report.verdict);
+  }
+  const counts: Record<string, number> = {};
+  for (const v of verdicts) counts[v] = (counts[v] ?? 0) + 1;
+  const [majorityVerdict, majorityCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] ?? ["", 0];
+  const passed = passes >= Math.ceil(runs / 2);
+  if (!passed) for (const k of lastChecks) console.log(`    ${k.passed ? "✓" : "✗"} ${k.name}: ${k.reason}`);
+  return { id, passes, runs, majorityVerdict, consistency: majorityCount / runs, passed };
+}
+
+function printStats(title: string, stats: EvalCaseStat[]): boolean {
+  console.log(`\n${title}`);
+  for (const s of stats) {
+    console.log(`${s.passed ? "✓" : "✗"} ${s.id.padEnd(38)} pass ${s.passes}/${s.runs} · consistency ${Math.round(s.consistency * 100)}% (majority ${s.majorityVerdict})`);
+  }
+  const passedCount = stats.filter((s) => s.passed).length;
+  const meanConsistency = stats.length ? stats.reduce((n, s) => n + s.consistency, 0) / stats.length : 1;
+  console.log(`${passedCount}/${stats.length} cases passed · mean consistency ${Math.round(meanConsistency * 100)}%`);
+  return passedCount === stats.length;
+}
+
 export async function runEvals(): Promise<boolean> {
   const cfg = getConfig();
   const route = routeModels("easy", cfg);
   const dir = writePromptfooFiles();
-  console.log(`Verifier evals · provider=${cfg.provider} · verifier=${route.verifierModel} · ${EVAL_CASES.length} cases`);
-  console.log(`(promptfoo files written to ${path.relative(REPO_ROOT, dir)})\n`);
-  let passed = 0;
-  for (const c of EVAL_CASES) {
-    const { report } = await runVerifier(c.input, { verifierModel: route.verifierModel, workerModel: route.workerModel });
-    const verdictOk = report.verdict === c.expected;
-    const checkOk = !c.mustFail || report.checks.some((k) => k.name === c.mustFail && !k.passed);
-    const ok = verdictOk && checkOk;
-    if (ok) passed++;
-    console.log(`${ok ? "✓" : "✗"} ${c.id.padEnd(38)} expected ${c.expected.padEnd(4)} got ${report.verdict}${c.mustFail ? ` · ${c.mustFail} ${checkOk ? "failed as expected" : "DID NOT FAIL"}` : ""}`);
-    if (!ok) for (const k of report.checks) console.log(`    ${k.passed ? "✓" : "✗"} ${k.name}: ${k.reason}`);
-  }
-  console.log(`\n${passed}/${EVAL_CASES.length} code-verifier cases passed`);
+  const runs = cfg.evalRuns;
+  console.log(`Verifier evals · provider=${cfg.provider} · verifier=${route.verifierModel} · temperature=${cfg.temperature} · ${runs} run(s)/case`);
+  console.log(`(promptfoo files written to ${path.relative(REPO_ROOT, dir)})`);
 
-  console.log(`\nTeam verifier evals (Scrum Mode) · ${TEAM_EVAL_CASES.length} cases`);
-  let teamPassed = 0;
-  for (const c of TEAM_EVAL_CASES) {
-    const { report } = await runTeamVerifier({ kind: c.kind, facts: EVAL_FACTS, output: c.output }, { verifierModel: route.verifierModel, workerModel: route.workerModel });
-    const verdictOk = report.verdict === c.expected;
-    const checkOk = !c.mustFail || report.checks.some((k) => k.name === c.mustFail && !k.passed);
-    const ok = verdictOk && checkOk;
-    if (ok) teamPassed++;
-    console.log(`${ok ? "✓" : "✗"} ${c.id.padEnd(38)} expected ${c.expected.padEnd(4)} got ${report.verdict}${c.mustFail ? ` · ${c.mustFail} ${checkOk ? "failed as expected" : "DID NOT FAIL"}` : ""}`);
-    if (!ok) for (const k of report.checks) console.log(`    ${k.passed ? "✓" : "✗"} ${k.name}: ${k.reason}`);
+  const codeStats: EvalCaseStat[] = [];
+  for (const c of EVAL_CASES) {
+    codeStats.push(await evalCase(c.id, runs, c.expected, c.mustFail, async () => (await runVerifier(c.input, { verifierModel: route.verifierModel, workerModel: route.workerModel })).report));
   }
-  console.log(`\n${teamPassed}/${TEAM_EVAL_CASES.length} team-verifier cases passed`);
-  return passed === EVAL_CASES.length && teamPassed === TEAM_EVAL_CASES.length;
+  const codeOk = printStats(`Code verifier (${EVAL_CASES.length} cases):`, codeStats);
+
+  const teamStats: EvalCaseStat[] = [];
+  for (const c of TEAM_EVAL_CASES) {
+    teamStats.push(await evalCase(c.id, runs, c.expected, c.mustFail, async () => (await runTeamVerifier({ kind: c.kind, facts: EVAL_FACTS, output: c.output }, { verifierModel: route.verifierModel, workerModel: route.workerModel })).report));
+  }
+  const teamOk = printStats(`Team verifier (Scrum Mode) (${TEAM_EVAL_CASES.length} cases):`, teamStats);
+  return codeOk && teamOk;
 }

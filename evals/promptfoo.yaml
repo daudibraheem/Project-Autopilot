@@ -16,6 +16,7 @@ providers:
     label: verifier (Claude Sonnet 5.5)
     config:
       max_tokens: 2000
+      temperature: 0        # non-determinism: raise to measure consistency across repeats
   # - id: openai:chat:gpt-5
   #   label: verifier (OpenAI)
 
