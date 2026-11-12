@@ -82,8 +82,11 @@ function testsSummary(r: ParsedTestResult | null): string {
 function g1Script(s: ScriptState): Decision {
   const adv = s.task.advisory;
   if (!adv) return { final: "No advisory in the task; nothing to do." };
+  if (!did(s, "search_knowledge")) {
+    return { tool: "search_knowledge", input: { query: `${adv.package} dependency security upgrade` }, thought: "Plan: check the runbooks for the dependency-upgrade procedure before touching anything." };
+  }
   if (!did(s, "read_file", (i) => i.path === "package.json")) {
-    return { tool: "read_file", input: { path: "package.json" }, thought: `Plan: ${adv.package}@${adv.installed} has a critical advisory fixed in ${adv.fixedIn}. Read package.json to bump it.` };
+    return { tool: "read_file", input: { path: "package.json" }, thought: `${adv.package}@${adv.installed} has a critical advisory fixed in ${adv.fixedIn}. Read package.json to bump it.` };
   }
   if (!did(s, "write_file", (i) => i.path === "package.json")) {
     const pkg = fileContent(s, "package.json") ?? "";
@@ -98,11 +101,14 @@ function g1Script(s: ScriptState): Decision {
   const tests = parseTestResult(lastOf(s, "run_tests")!.result);
   if (tests && tests.newFailures.length === 0) {
     const fixed = s.actions.filter((a) => a.name === "write_file").map((a) => String(a.input.path));
+    const kb = lastOf(s, "search_knowledge")?.result ?? "";
+    const runbook = /(docs\/runbooks\/[\w.-]+\.md:\d+-\d+)/.exec(kb)?.[1];
     return {
       final:
         `Bumped ${adv.package} from ${adv.installed} to ${adv.fixedIn} (fixes the critical advisory). ` +
         `Version ${adv.fixedIn} renamed \`${adv.exportsChange?.removed[0] ?? "parse"}\` to \`${adv.exportsChange?.added[0] ?? "parseDate"}\`, so I updated the call site. ` +
         `Files changed: ${fixed.join(", ")}. run_tests: ${testsSummary(tests)}.` +
+        (runbook ? ` Followed the upgrade runbook [${runbook}].` : "") +
         (tests.preExistingFailures.length ? " The remaining failure is pre-existing on main (tracked by G2) and unrelated to this change." : ""),
     };
   }

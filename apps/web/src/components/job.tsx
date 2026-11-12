@@ -227,6 +227,7 @@ const EV_LABEL: Record<string, string> = {
   classifier: "Classifier",
   rerun: "Re-run",
   git: "Git",
+  knowledge: "Knowledge base",
 };
 
 export function EvidenceList({ evidence }: { evidence: Evidence[] | null }) {

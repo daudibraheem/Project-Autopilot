@@ -7,6 +7,7 @@ import { approveJob, rejectJob, requestChanges } from "@autopilot/core/approvals
 import { checkGoalsAndConduct } from "@autopilot/core/checks";
 import { createJob, startJobForGoal } from "@autopilot/core/conductor";
 import { ALL_GOAL_IDS, type GoalId } from "@autopilot/core/contract";
+import { indexKnowledgeFromRepo } from "@autopilot/core/knowledge";
 import { saveFlakyModel, trainFlakyModel } from "@autopilot/core/ml/flaky";
 import { runJob } from "@autopilot/core/pipeline";
 import { stopBoss } from "@autopilot/core/queue";
@@ -61,7 +62,8 @@ program
       console.log(await reintroduceG1(dir));
     } else {
       await seedDemoTarget(dir, { force: true });
-      console.log(`Seeded ${dir}`);
+      const n = await indexKnowledgeFromRepo(dir);
+      console.log(`Seeded ${dir} · indexed ${n} knowledge passage(s) from docs/runbooks/`);
     }
   });
 

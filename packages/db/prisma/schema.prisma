@@ -244,6 +244,22 @@ model MlPrediction {
   @@index([createdAt])
 }
 
+/// Knowledge base (RAG): runbook passages indexed with Postgres full-text search (tsv column).
+/// Default offline search is FTS; pgvector embeddings are an optional extra when a provider key is set.
+model KnowledgeDoc {
+  id        String                   @id @default(cuid())
+  path      String // source path, e.g. docs/runbooks/dependency-upgrades.md
+  title     String
+  lineStart Int
+  lineEnd   Int
+  content   String                   @db.Text
+  tsv       Unsupported("tsvector")?
+  createdAt DateTime                 @default(now())
+
+  @@index([path])
+  @@index([tsv], type: Gin)
+}
+
 // ---------------------------------------------------------------------------
 // Scrum Mode: normalised sprint data (pseudonymised; real names only in PersonAlias)
 // ---------------------------------------------------------------------------

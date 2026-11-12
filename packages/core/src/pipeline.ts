@@ -19,6 +19,7 @@ import { checkGoal } from "./goals/index";
 import { commitWorkspace, prepareWorkspace, pushBranch, recentCommits, showCommit, workspaceDiff, workspacePath } from "./git";
 import { complete } from "./llm/gateway";
 import { routeModels } from "./llm/router";
+import { knowledgeCitationsIn, knowledgePathsExist, searchKnowledge } from "./knowledge";
 import { loadLessons, searchLessons } from "./lessons";
 import { skillForJobType, skillStamp } from "./skills";
 import { decide, failureRateFor, type FlakyDecision, loadFlakyModel, predictFlaky } from "./ml/flaky";
@@ -298,7 +299,7 @@ export async function runJob(jobId: string): Promise<void> {
           },
           exec: async (call) => {
             const out = await executeTool(
-              { jobId, ws, contract, baselineFailures: new Set(baseline), demoMode, searchLessons: (q) => searchLessons(q), addEvidence },
+              { jobId, ws, contract, baselineFailures: new Set(baseline), demoMode, searchLessons: (q) => searchLessons(q), searchKnowledge: (q) => searchKnowledge(q), addEvidence },
               call,
             );
             await prisma.job.update({ where: { id: jobId }, data: { evidence: evidence as unknown as object } });
@@ -361,6 +362,21 @@ export async function runJob(jobId: string): Promise<void> {
         },
       );
       report = v.report;
+      // RAG: the verifier stage confirms every runbook the worker cited actually exists in the index.
+      const cited = knowledgeCitationsIn(fresh.explanation ?? "");
+      if (cited.length) {
+        const exist = await knowledgePathsExist(cited);
+        const missing = cited.filter((p) => !exist[p]);
+        report.checks.push({
+          name: "knowledge_citations_exist",
+          passed: missing.length === 0,
+          reason: missing.length ? `Cited knowledge paths not in the index: ${missing.join(", ")}` : `All ${cited.length} cited runbook path(s) exist in the knowledge base.`,
+        });
+        if (missing.length) {
+          report.verdict = "fail";
+          report.concerns.push(`Worker cited knowledge sources that do not exist: ${missing.join(", ")}.`);
+        }
+      }
       await prisma.verifierReport.create({
         data: { jobId, attempt: fresh.attempt, model: route.verifierModel, provider: v.responses.at(-1)?.provider ?? route.provider, verdict: report.verdict, checks: report.checks, concerns: report.concerns },
       });
