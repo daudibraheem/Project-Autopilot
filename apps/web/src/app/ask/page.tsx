@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ModesBar } from "@/components/modes";
 import { SourceChip } from "@/components/team";
 import { Button, Check, ErrorNote, Mono, PageHeader, Section } from "@/components/ui";
 import { usd } from "@/lib/format";
@@ -71,10 +72,11 @@ export default function AskPage() {
         subtitle={
           <>
             Sprint questions answered with the read-only MCP tools <Mono>get_sprint</Mono>, <Mono>list_work_items</Mono> and <Mono>get_item_events</Mono>. The model sees pseudonyms only. Every
-            answer must cite its sources, checked in plain code.
+            answer must cite its sources, checked in plain code. This is <strong>Assistant</strong> mode — one of the three ways the same engine runs.
           </>
         }
       />
+      <ModesBar active="Assistant" />
       <form
         className="mb-6 flex flex-wrap gap-3"
         onSubmit={(e) => {

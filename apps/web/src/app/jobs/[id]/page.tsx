@@ -3,6 +3,7 @@ import Link from "next/link";
 import { use } from "react";
 import { ApprovalActions } from "@/components/ApprovalActions";
 import { ContextBar, ContractView, Diff, EvidenceList, GateChecklist, RepoMapView, Timeline, VerifierView } from "@/components/job";
+import { ModeBadge } from "@/components/modes";
 import { BriefView, Counts, NudgeCard } from "@/components/team";
 import { ErrorNote, JobStatus, Loading, Mono, Section } from "@/components/ui";
 import { dateTime, usd } from "@/lib/format";
@@ -30,6 +31,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
           <h1 className="text-2xl font-semibold tracking-tight">{job.goalLabel}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted">
             <JobStatus status={job.status} />
+            <ModeBadge source={job.source} />
             <span>{job.jobType}</span>
             <Mono>{job.branch}</Mono>
             {job.attempt > 1 && <span>attempt {job.attempt}</span>}

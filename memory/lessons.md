@@ -44,3 +44,9 @@ evidence: brief published by human
 lesson: This team treats 'Waiting for QA' as a normal wait; those items are not stuck and should not be flagged.
 next time: Build the facts first in code; let the model only word them, and keep people out of it.
 
+# 2026-11-12 · setup-docs-fix · setup-docs-work
+result: fail   confidence: 60%
+evidence: tests_fresh_sandbox: Suite did not start: npm error code ENOTCACHED npm error request to https://registry.npmjs.org/left-padx failed: cache mode is 'only-if-cached' but no cached response is available. npm error A complete log of this run …
+lesson: Failed because tests_fresh_sandbox; paths_in_scope.
+next time: Stay inside allowedPaths and back every claim with a sandbox run after the last edit.
+
