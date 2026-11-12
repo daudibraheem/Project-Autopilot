@@ -120,6 +120,10 @@ function g1Script(s: ScriptState): Decision {
   const testSrc = fileContent(s, failing.file) ?? "";
   const mod = /require\('\.\.\/(src\/[\w/-]+)'\)/.exec(testSrc)?.[1];
   const srcPath = mod ? `${mod}.js` : "src/index.js";
+  const removedExport = adv.exportsChange?.removed[0] ?? "parse";
+  if (!did(s, "repo_map", (i) => i.symbol === removedExport)) {
+    return { tool: "repo_map", input: { symbol: removedExport }, thought: `${adv.package} ${adv.fixedIn} removed \`${removedExport}\`. Map the codebase to find every call site before editing.` };
+  }
   if (!did(s, "read_file", (i) => i.path === srcPath)) {
     return { tool: "read_file", input: { path: srcPath }, thought: `The test exercises ${srcPath}; read it to find the call into ${adv.package}.` };
   }

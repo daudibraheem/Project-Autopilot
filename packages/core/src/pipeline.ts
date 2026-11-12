@@ -302,7 +302,10 @@ export async function runJob(jobId: string): Promise<void> {
               { jobId, ws, contract, baselineFailures: new Set(baseline), demoMode, searchLessons: (q) => searchLessons(q), searchKnowledge: (q) => searchKnowledge(q), addEvidence },
               call,
             );
-            await prisma.job.update({ where: { id: jobId }, data: { evidence: evidence as unknown as object } });
+            await prisma.job.update({
+              where: { id: jobId },
+              data: { evidence: evidence as unknown as object, ...(out.repoMap ? { analysis: { task: prepared.task, repoMap: out.repoMap } as object } : {}) },
+            });
             return out;
           },
           record: (s) => rec.record("worker", s),

@@ -9,6 +9,7 @@ import type { Contract } from "../contract";
 import type { ToolCall, ToolSpec } from "../llm/types";
 import { citation, type KnowledgeHit } from "../knowledge";
 import { checkCommand, checkDependencies, checkPathAccess, checkPackageJsonScripts, normalizeRepoPath } from "../policy";
+import { buildRepoMap, listCodeFiles, renderMapText, type RepoMap } from "../repomap";
 import { FLAKY_SEEDS, parseTap, runInSandbox, TEST_COMMAND, testKey, trimOutput } from "../sandbox";
 import { existsInVendor, existsOnNpm } from "../sources";
 import { detectInjection, wrapUntrusted } from "../untrusted";
@@ -55,11 +56,16 @@ export const TOOL_SPECS: ToolSpec[] = [
     description: "Search the knowledge base (runbooks) with full-text search. Returns passages with their source path and line range; cite the path in your explanation.",
     inputSchema: { type: "object", properties: { query: { type: "string" } }, required: ["query"], additionalProperties: false },
   },
+  {
+    name: "repo_map",
+    description: "Map the codebase: files with their exports and imports. Pass a symbol to also list every call site of it (path:line). Only files inside allowedPaths are mapped.",
+    inputSchema: { type: "object", properties: { symbol: { type: "string" } }, additionalProperties: false },
+  },
 ];
 
 export interface EvidenceItem {
   step: number;
-  kind: "tests" | "command" | "policy_denial" | "injection_flag" | "write" | "classifier" | "rerun" | "git" | "knowledge";
+  kind: "tests" | "command" | "policy_denial" | "injection_flag" | "write" | "classifier" | "rerun" | "git" | "knowledge" | "repo_map";
   tool?: string;
   command?: string;
   target?: string;
@@ -90,6 +96,7 @@ export interface ToolOutcome {
   isError: boolean;
   denied?: { rule: string; reason: string; target: string };
   wrote?: string;
+  repoMap?: RepoMap;
 }
 
 const MAX_READ = 60_000;
@@ -222,6 +229,21 @@ export async function executeTool(ctx: ToolContext, call: ToolCall): Promise<Too
       ctx.addEvidence({ kind: "knowledge", tool: "search_knowledge", target: query, note: hits.map((h) => citation(h)).join(", ") });
       const body = hits.map((h) => `[${citation(h)}] ${h.title}\n${h.snippet}`).join("\n---\n");
       return { content: wrapUntrusted("knowledge", body), isError: false };
+    }
+
+    case "repo_map": {
+      const symbol = str(input.symbol) || undefined;
+      const files = listCodeFiles(ctx.ws)
+        .filter((f) => checkPathAccess(ctx.contract, f, "read").allowed)
+        .map((f) => ({ path: f, content: readFileSync(path.join(ctx.ws, f), "utf8") }));
+      const map = buildRepoMap(files, { symbol });
+      ctx.addEvidence({
+        kind: "repo_map",
+        tool: "repo_map",
+        target: symbol ?? "(map)",
+        note: symbol ? `${map.callSites.length} call site(s) of ${symbol}: ${map.callSites.map((c) => `${c.path}:${c.line}`).join(", ") || "none"}` : `${map.files.length} files mapped`,
+      });
+      return { content: wrapUntrusted("repo_map", renderMapText(map)), isError: false, repoMap: map };
     }
 
     default:

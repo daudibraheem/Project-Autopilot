@@ -150,8 +150,15 @@ export interface JobDetail {
   approvals: { id: string; decision: string; reason: string | null; actor: string; createdAt: string; attempt: number }[];
   audit: AuditRow[];
   trust: { level: number; label: string; consecutivePasses: number; cap?: number };
-  analysis: { kind?: "brief" | "nudge"; briefId?: string | null } | null;
+  analysis: { kind?: "brief" | "nudge"; briefId?: string | null; repoMap?: RepoMap } | null;
   team: { brief: Brief | null; nudges: Nudge[]; people: People } | null;
+}
+
+export interface RepoMap {
+  symbol?: string;
+  files: { path: string; exports: string[]; imports: { module: string; symbols: string[]; resolved?: string; line: number }[] }[];
+  edges: { from: string; to: string }[];
+  callSites: { symbol: string; path: string; line: number; text: string }[];
 }
 
 export type People = Record<string, string>;

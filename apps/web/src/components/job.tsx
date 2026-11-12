@@ -1,8 +1,46 @@
 "use client";
 import { useState } from "react";
 import { clock, ms, usd } from "@/lib/format";
-import type { Evidence, JobDetail, Step } from "@/lib/types";
+import type { Evidence, JobDetail, RepoMap, Step } from "@/lib/types";
 import { Check, cx, Empty, Mono } from "./ui";
+
+/** Codebase map (repo_map tool): files with exports/imports, and call sites of the mapped symbol. */
+export function RepoMapView({ map }: { map: RepoMap }) {
+  return (
+    <div className="space-y-4 text-sm">
+      {map.symbol && (
+        <div>
+          <p className="mb-1 font-medium">
+            Call sites of <Mono>{map.symbol}</Mono> <span className="text-muted">({map.callSites.length})</span>
+          </p>
+          {map.callSites.length === 0 ? (
+            <Empty>No call sites found.</Empty>
+          ) : (
+            <ul className="space-y-1">
+              {map.callSites.map((c) => (
+                <li key={`${c.path}:${c.line}`} className="font-mono text-xs">
+                  <span className="text-accent">
+                    {c.path}:{c.line}
+                  </span>{" "}
+                  <span className="text-muted">{c.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      <ul className="space-y-1.5">
+        {map.files.map((f) => (
+          <li key={f.path} className="text-xs">
+            <Mono>{f.path}</Mono>
+            {f.exports.length > 0 && <span className="ml-2 text-muted">exports: {f.exports.join(", ")}</span>}
+            {f.imports.length > 0 && <span className="ml-2 text-muted">imports: {f.imports.map((i) => i.module).join(", ")}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** Small custom unified-diff renderer (monospace, add/remove tinted). */
 export function Diff({ diff }: { diff: string | null }) {

@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { use } from "react";
 import { ApprovalActions } from "@/components/ApprovalActions";
-import { ContractView, Diff, EvidenceList, GateChecklist, Timeline, VerifierView } from "@/components/job";
+import { ContractView, Diff, EvidenceList, GateChecklist, RepoMapView, Timeline, VerifierView } from "@/components/job";
 import { BriefView, Counts, NudgeCard } from "@/components/team";
 import { ErrorNote, JobStatus, Loading, Mono, Section } from "@/components/ui";
 import { dateTime, usd } from "@/lib/format";
@@ -135,6 +135,11 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
           <Section title="Contract">
             <ContractView c={job.contract} />
           </Section>
+          {job.analysis?.repoMap && (
+            <Section title="Codebase map" aside="repo_map tool">
+              <RepoMapView map={job.analysis.repoMap} />
+            </Section>
+          )}
           <Section title="Evidence" aside="Commands, exit codes, denials">
             <EvidenceList evidence={job.evidence} />
           </Section>
