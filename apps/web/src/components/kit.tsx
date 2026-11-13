@@ -4,8 +4,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { cx } from "./ui";
 
 // ---------------- Card ----------------
-export function Card({ children, className, interactive }: { children: ReactNode; className?: string; interactive?: boolean }) {
-  return <div className={cx("rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)]", interactive && "transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]", className)}>{children}</div>;
+export function Card({ children, className, interactive, id }: { children: ReactNode; className?: string; interactive?: boolean; id?: string }) {
+  return <div id={id} className={cx("rounded-xl border border-line bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)]", interactive && "transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]", className)}>{children}</div>;
 }
 
 // ---------------- Status pill ----------------

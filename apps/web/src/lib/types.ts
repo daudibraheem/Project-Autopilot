@@ -165,6 +165,22 @@ export interface JobDetail {
   team: { brief: Brief | null; nudges: Nudge[]; people: People } | null;
 }
 
+export interface Forecast {
+  probability: number;
+  runs: number;
+  dailyRateMean: number;
+  remainingPoints: number;
+  completedPoints: number;
+  totalPoints: number;
+  daysRemaining: number;
+  finalP10: number;
+  finalP50: number;
+  finalP90: number;
+  burnup: { day: number; target: number; actual: number | null; p10: number; p50: number; p90: number }[];
+  pastThroughput: number[];
+  why: string;
+}
+
 export interface RepoMap {
   symbol?: string;
   files: { path: string; exports: string[]; imports: { module: string; symbols: string[]; resolved?: string; line: number }[] }[];
