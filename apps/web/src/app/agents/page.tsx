@@ -94,7 +94,7 @@ export default function AgentsPage() {
           ))}
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div data-presenter="agents" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {data.agents.map((a) => (
             <AgentCard key={a.jobType} a={a} />
           ))}

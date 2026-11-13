@@ -128,6 +128,25 @@ body {
   animation: slidein 220ms ease-out;
 }
 
+/* Presenter mode: soft spotlight on the step's target, dim the rest. */
+.spotlight {
+  position: relative;
+  z-index: 30;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 0 9999px color-mix(in srgb, var(--bg) 70%, transparent);
+  transition: box-shadow 0.3s ease-out;
+}
+/* Hide low-level debug detail unless hovered, while presenting. */
+.presenter [data-debug] {
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+.presenter [data-debug]:hover {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .status-changed,
   .animate-in {

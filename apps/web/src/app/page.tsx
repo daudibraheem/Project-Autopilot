@@ -195,7 +195,7 @@ export default function OverviewPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40" />)}</div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div data-presenter="overview" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <HeroCard eyebrow="S1 · Standup" tone={toneOf(tg("standup-brief-ready")?.latest?.status)} value={tg("standup-brief-ready")?.latest?.status === "green" ? "Published" : "Not yet"} title="Standup brief" reason={tg("standup-brief-ready")?.latest?.summary ?? ""} href="/standup" action="Open standup" />
             <HeroCard eyebrow="S2 · Flow" tone={toneOf(s2?.latest?.status)} value={`${stuckCount} stuck`} title="Stuck work" reason={s2?.latest?.summary ?? "No stuck items"} href="/sprint" action="Open board" />
             <Card className="flex flex-col p-5" interactive>

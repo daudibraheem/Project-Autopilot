@@ -169,7 +169,11 @@ function Board() {
                 <div className="h-full rounded-full bg-ok transition-[width] duration-500" style={{ width: `${pct}%` }} />
               </div>
             </Card>
-            {f && <ForecastPanel forecast={f} compact />}
+            {f && (
+              <div data-presenter="forecast">
+                <ForecastPanel forecast={f} compact />
+              </div>
+            )}
           </div>
 
           <div className="mb-4 flex flex-wrap items-center gap-1 rounded-lg border border-line bg-surface-2 p-1">
@@ -181,7 +185,7 @@ function Board() {
             <span className="ml-auto px-2 text-xs text-muted">{items.length} item(s)</span>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div data-presenter="board" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {COLUMNS.map((col) => {
               const colItems = items.filter((i) => columnOf(i) === col.id);
               return (

@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { SystemInfo } from "@/lib/types";
 import { post, usePoll } from "@/lib/usePoll";
 import { Toaster } from "./kit";
+import { PresenterBar } from "./presenter";
 import { cx } from "./ui";
 
 /** Tiny inline icon set (no icon dependency; crisp in both themes). */
@@ -111,10 +112,28 @@ function NavLink({ href, label, icon, active, badge }: { href: string; label: st
   );
 }
 
+const TITLES: Record<string, string> = {
+  "/": "Overview",
+  "/sprint": "Sprint board",
+  "/standup": "Standup",
+  "/approvals": "Approvals",
+  "/agents": "Agents",
+  "/ask": "Ask Autopilot",
+  "/audit": "Audit log",
+  "/jobs": "Jobs",
+  "/trust": "Trust ledger",
+  "/lessons": "Lessons",
+  "/ml": "ML classifier",
+};
+
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const { data: sys } = usePoll<SystemInfo>("/api/system", 4000);
   const isActive = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  useEffect(() => {
+    const key = Object.keys(TITLES).find((h) => (h === "/" ? path === "/" : path.startsWith(h)));
+    document.title = `${key ? TITLES[key] : "Not found"} · Autopilot`;
+  }, [path]);
   return (
     <div className="min-h-screen lg:flex">
       <aside className="border-b border-line bg-surface lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:border-b-0 lg:border-r">
@@ -137,7 +156,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         {sys && (
-          <div className="hidden space-y-1.5 border-t border-line px-5 py-4 text-xs text-muted lg:block">
+          <div data-debug className="hidden space-y-1.5 border-t border-line px-5 py-4 text-xs text-muted lg:block">
             <div>Provider <span className="font-mono text-fg">{sys.provider}</span></div>
             <div>Worker <span className="font-mono text-fg">{sys.workerModel}</span></div>
             <div>Sandbox <span className={cx("font-mono", sys.sandbox.unsafe ? "text-bad" : "text-fg")}>{sys.sandbox.mode}</span></div>
@@ -181,6 +200,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <main className="mx-auto max-w-6xl px-5 py-8 sm:px-8 lg:py-10">{children}</main>
       </div>
       <Toaster />
+      <PresenterBar />
     </div>
   );
 }
