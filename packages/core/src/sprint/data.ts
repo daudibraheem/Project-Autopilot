@@ -32,14 +32,38 @@ export function sprintItems(sprintId: string) {
   return prisma.workItem.findMany({ where: { sprintId }, orderBy: { key: "asc" } });
 }
 
-/** Code goals whose latest check on main is red. */
+/** Ref used for a seeded, self-contained "blocked build" snapshot (so the Scrum demo is order-independent). */
+export const SPRINT_BUILD_REF = "sprint-build";
+
+/**
+ * Goals a sprint item can be "blocked by build" on: the live main-build check (ref "main") when red,
+ * plus any seeded red build snapshot (ref "sprint-build") planted by seed-sprint. The snapshot lets
+ * blocked_by_build work in any demo order, even after the code demo has fixed G2 on main.
+ */
 export async function redGoalIds(): Promise<Set<string>> {
   const out = new Set<string>();
   for (const goalId of ["no-critical-vulns", "main-build-green", "setup-docs-work"]) {
     const c = await prisma.goalCheck.findFirst({ where: { goalId, ref: "main" }, orderBy: { createdAt: "desc" }, select: { status: true } });
     if (c?.status === "red") out.add(goalId);
   }
+  const seeded = await prisma.goalCheck.findMany({ where: { ref: SPRINT_BUILD_REF, status: "red" }, select: { goalId: true } });
+  for (const s of seeded) out.add(s.goalId);
   return out;
+}
+
+/** Plant a self-contained red build snapshot for the sprint's blocked item (mock demo only). */
+export async function seedBlockedBuild(goalId = "main-build-green"): Promise<void> {
+  await prisma.goalCheck.deleteMany({ where: { ref: SPRINT_BUILD_REF } });
+  await prisma.goalCheck.create({
+    data: {
+      goalId,
+      ref: SPRINT_BUILD_REF,
+      status: "red",
+      summary: "Seeded blocked build: the linked Autopilot build for this sprint is red (demo; independent of the live main build so the Scrum demo works in any order)",
+      evidence: {},
+      durationMs: 0,
+    },
+  });
 }
 
 type ItemRow = Awaited<ReturnType<typeof sprintItems>>[number];

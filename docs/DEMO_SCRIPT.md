@@ -113,7 +113,7 @@ Flip the **kill switch** on the Overview. A red banner appears on every page. Cl
 
 # Part 2: Scrum Mode
 
-Mock mode, no API key, no internet, no Jira. It's best to run this right after `pnpm demo`, while G2 is still red, so one item shows `blocked_by_build`. If you've already fixed G2, run `pnpm cli seed --real-bug` and click **Check goals now** first.
+Mock mode, no API key, no internet, no Jira. This runs in **any order** — `pnpm cli seed-sprint` plants its own red build snapshot, so PAY-155 shows `blocked_by_build` whether or not the code demo has fixed G2.
 
 ## S1. Team health turns red
 
@@ -133,7 +133,7 @@ Open **Sprint**. Point out:
 - **Stuck items** are highlighted with reason codes:
   - PAY-142 and PAY-147: `no_activity` (4–5 days);
   - PAY-151: `review_waiting` (PR open 30 h with no review);
-  - PAY-155: `blocked_by_build` (linked to G2, which is red).
+  - PAY-155: `blocked_by_build` (linked to the G2 build goal; seed-sprint plants a red build snapshot so this holds in any order).
 - **PAY-153** is in "Waiting for QA" for 5 days and is **not** flagged: "Normal wait, not stuck".
 - **PAY-160** is marked **Added mid-sprint**.
 - **PAY-138** and **PAY-139** have **Autopilot agent** badges and link to their Autopilot jobs and trust level.

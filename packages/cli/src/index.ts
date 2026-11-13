@@ -182,6 +182,10 @@ program
     const { MockSprintProvider } = await import("@autopilot/core/sprint/mock-provider");
     await clearSprintData({ aliases: true });
     const r = await syncSprint(new MockSprintProvider({ agentJobIds: await agentJobIdsForMock() }));
+    // Self-contained blocked-by-build situation: plant a red build snapshot so PAY-155 is blocked
+    // regardless of the live G2 state (the Scrum demo then works in any order).
+    const { seedBlockedBuild } = await import("@autopilot/core/sprint/data");
+    await seedBlockedBuild();
     console.log(`Seeded "${r.sprint?.name}" (+ previous "${r.previous?.name}"): ${r.items} items, ${r.events} events, ${r.flagged.length} injection comment(s) flagged`);
     const { runGoalChecks, TEAM_GOAL_IDS } = await import("@autopilot/core/goals/index");
     for (const g of await runGoalChecks(TEAM_GOAL_IDS, "seed-sprint")) console.log(`${g.status.padEnd(5)} ${g.goalId.padEnd(20)} ${g.summary}`);
