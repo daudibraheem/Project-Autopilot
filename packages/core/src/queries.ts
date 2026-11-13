@@ -30,6 +30,7 @@ export async function systemInfo() {
   } catch (e) {
     routeError = (e as Error).message;
   }
+  const sprint = await prisma.sprint.findFirst({ where: { state: "active" }, orderBy: { start: "desc" }, select: { name: true, start: true, end: true } });
   return {
     provider: cfg.provider,
     workerModel: route?.workerModel ?? cfg.workerModel,
@@ -40,6 +41,7 @@ export async function systemInfo() {
     githubMode: githubMode(cfg),
     killSwitch: await isKillSwitchOn(),
     pendingApprovals: await prisma.job.count({ where: { status: "awaiting_approval" } }),
+    sprint: sprint ? { name: sprint.name, start: sprint.start, end: sprint.end } : null,
   };
 }
 
@@ -114,6 +116,42 @@ export async function approvalsQueue() {
   const details = await Promise.all(jobs.map((j) => jobDetail(j.id)));
   const recent = await prisma.approvalDecision.findMany({ orderBy: { createdAt: "desc" }, take: 10, include: { job: { select: { goalId: true, jobType: true } } } });
   return { pending: details.filter(Boolean), recent };
+}
+
+const JOB_TYPE_LABEL: Record<string, string> = {
+  "dependency-security-fix": "Dependency security",
+  "ci-failure-triage": "Flaky / build triage",
+  "setup-docs-fix": "Setup-docs fix",
+  "standup-brief": "Standup brief",
+  "nudge-draft": "Nudge drafts",
+};
+
+const PASS_STATUSES = ["merged", "approved", "published"];
+
+/** "Your AI teammates": per job type, trust, run stats, recent results and cost. */
+export async function agentsData() {
+  const agents = await Promise.all(
+    JOB_TYPES.map(async (t) => {
+      const trust = await getTrust(t);
+      const jobs = await prisma.job.findMany({ where: { jobType: t }, orderBy: { createdAt: "desc" }, take: 30, select: { id: true, status: true, costUsd: true } });
+      const decided = trust.approvals + trust.rejections + trust.gateFailures;
+      return {
+        jobType: t,
+        label: JOB_TYPE_LABEL[t] ?? t,
+        team: isTeamJobType(t) ? "team" : "code",
+        trust: { level: trust.level, label: LEVEL_LABEL[trust.level], cap: trust.cap, autoMergeAllowed: trust.autoMergeAllowed },
+        runs: trust.totalRuns,
+        approvals: trust.approvals,
+        rejections: trust.rejections,
+        gateFailures: trust.gateFailures,
+        approvalRate: decided ? trust.approvals / decided : null,
+        costSprint: jobs.reduce((n, j) => n + j.costUsd, 0),
+        last5: jobs.slice(0, 5).map((j) => ({ id: j.id, ok: PASS_STATUSES.includes(j.status), status: j.status })),
+        cappedForever: trust.cap === 0,
+      };
+    }),
+  );
+  return { agents, levels: LEVEL_LABEL };
 }
 
 export async function trustData() {

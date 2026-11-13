@@ -10,6 +10,7 @@ export interface SystemInfo {
   githubMode: boolean;
   killSwitch: boolean;
   pendingApprovals: number;
+  sprint: { name: string; start: string; end: string } | null;
 }
 
 export interface GoalView {
