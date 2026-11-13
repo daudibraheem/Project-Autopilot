@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 // Set the theme before paint (respects system preference unless the user chose one).
-const themeScript = `(function(){try{var t=localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();`;
+const themeScript = `(function(){try{var q=new URLSearchParams(location.search).get('theme');if(q)localStorage.setItem('theme',q);var t=q||localStorage.getItem('theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

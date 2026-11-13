@@ -120,13 +120,28 @@ Team rules (AGENTS.md 8–13) are enforced in code:
 - least data.
 
 ```bash
-pnpm cli seed-sprint          # mock sprint with planted situations → Overview "Team health"
+pnpm cli seed-sprint          # mock sprint + 6 past sprints + planted situations → Overview "Team health"
+pnpm cli sprint-add-item      # add one mid-sprint item (scope change) and recompute the forecast
 pnpm cli demo-bad-brief       # scripted blaming/miscounting brief, blocked by gate + verifier
 pnpm cli ask "What's stuck and why?"
 pnpm mcp                      # read-only sprint MCP server on stdio
 ```
 
 Walkthrough: `docs/DEMO_SCRIPT.md` part 2.
+
+### Polished UI + a video-ready walkthrough
+
+- **Run morning routine** (Overview): one button runs check → find stuck → draft brief → verifier → gate → waiting, as a live pipeline.
+- **Sprint board**: kanban with Human/AI-agent badges, stuck reasons, and a Monte-Carlo **sprint forecast** (S3 goal). `+ Add mid-sprint item` shows the forecast drop live.
+- **Agents**: each AI teammate's trust, run stats and recent results; nudges are locked to "always needs a human".
+- **Presenter mode** for recording: open `http://localhost:3000/?presenter=1` — a 7-step guided tour (→/← to move, **R** to reset the demo). Narration: [`docs/VIDEO_SCRIPT.md`](docs/VIDEO_SCRIPT.md).
+
+Screens (light + dark, 1920×1080):
+
+| Overview | Sprint board |
+|---|---|
+| ![Overview](docs/screenshots/overview-light.png) | ![Sprint board](docs/screenshots/sprint-dark.png) |
+| ![Overview (dark)](docs/screenshots/overview-dark.png) | ![Agents (dark)](docs/screenshots/agents-dark.png) |
 
 ### Connecting a test Jira project (optional)
 
