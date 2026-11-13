@@ -4,24 +4,29 @@ import { HIGH_RISK_PATTERNS } from "./policy";
 
 /** Code-health goals (G1–G3). */
 export const GOAL_IDS = ["no-critical-vulns", "main-build-green", "setup-docs-work"] as const;
-/** Team-health goals (Scrum Mode, S1–S2). */
-export const TEAM_GOAL_IDS = ["standup-brief-ready", "no-stuck-work"] as const;
+/** Team-health goals (Scrum Mode, S1–S3). */
+export const TEAM_GOAL_IDS = ["standup-brief-ready", "no-stuck-work", "sprint-on-track"] as const;
 export const ALL_GOAL_IDS = [...GOAL_IDS, ...TEAM_GOAL_IDS] as const;
 export type GoalId = (typeof ALL_GOAL_IDS)[number];
 export type TeamGoalId = (typeof TEAM_GOAL_IDS)[number];
 export const isTeamGoal = (g: string): g is TeamGoalId => (TEAM_GOAL_IDS as readonly string[]).includes(g);
+
+/** Check-only goals are shown and checked, but never spawn a fixing job (nothing to "fix"). */
+export const CHECK_ONLY_GOAL_IDS = ["sprint-on-track"] as const;
+export const isCheckOnlyGoal = (g: string): boolean => (CHECK_ONLY_GOAL_IDS as readonly string[]).includes(g);
 
 export const JOB_TYPES = ["dependency-security-fix", "ci-failure-triage", "setup-docs-fix", "standup-brief", "nudge-draft"] as const;
 export const TEAM_JOB_TYPES = ["standup-brief", "nudge-draft"] as const;
 export const isTeamJobType = (t: string) => (TEAM_JOB_TYPES as readonly string[]).includes(t);
 export type JobType = (typeof JOB_TYPES)[number];
 
-export const GOAL_JOB_TYPE: Record<GoalId, JobType> = {
+export const GOAL_JOB_TYPE: Partial<Record<GoalId, JobType>> = {
   "no-critical-vulns": "dependency-security-fix",
   "main-build-green": "ci-failure-triage",
   "setup-docs-work": "setup-docs-fix",
   "standup-brief-ready": "standup-brief",
   "no-stuck-work": "nudge-draft",
+  // "sprint-on-track" is check-only: no fixing job.
 };
 
 export const GOAL_LABEL: Record<GoalId, string> = {
@@ -30,6 +35,7 @@ export const GOAL_LABEL: Record<GoalId, string> = {
   "setup-docs-work": "G3 · Setup docs work",
   "standup-brief-ready": "S1 · Standup brief ready",
   "no-stuck-work": "S2 · No stuck work",
+  "sprint-on-track": "S3 · Sprint forecast",
 };
 
 export const DoneCriterion = z.object({
@@ -150,5 +156,7 @@ export function buildContract(jobId: string, goalId: GoalId, opts: { realMode?: 
           { kind: "human_sends", description: "Drafts only: a human copies and sends; trust is capped at L0", params: {} },
         ],
       });
+    default:
+      throw new Error(`No contract for check-only goal "${goalId}" (it never spawns a job)`);
   }
 }

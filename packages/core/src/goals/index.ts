@@ -3,7 +3,7 @@ import { audit } from "../audit";
 import { getConfig } from "../config";
 import type { GoalId } from "../contract";
 import { GOAL_IDS, isTeamGoal, TEAM_GOAL_IDS } from "../contract";
-import { s1StandupBriefReady, s2NoStuckWork } from "./team";
+import { s1StandupBriefReady, s2NoStuckWork, s3SprintOnTrack } from "./team";
 import { g1NoCriticalVulns } from "./g1-no-critical-vulns";
 import { g2MainBuildGreen } from "./g2-main-build-green";
 import { g3SetupDocsWork } from "./g3-setup-docs-work";
@@ -21,6 +21,7 @@ export const GOALS: Record<GoalId, StandingGoal> = {
   "setup-docs-work": g3SetupDocsWork,
   "standup-brief-ready": s1StandupBriefReady,
   "no-stuck-work": s2NoStuckWork,
+  "sprint-on-track": s3SprintOnTrack,
 };
 
 export { TEAM_GOAL_IDS };

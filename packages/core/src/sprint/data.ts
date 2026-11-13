@@ -51,6 +51,23 @@ export async function redGoalIds(): Promise<Set<string>> {
   return out;
 }
 
+/** Deterministic throughput (story points completed) of 6 past sprints, for the forecast.
+ * Realistic ~68/sprint band; with the seeded sprint this yields a ~amber start that a scope add drops. */
+export const PAST_THROUGHPUT = [68, 72, 70, 74, 66, 71];
+const DAY_MS = 86400_000;
+
+/** Seed 6 closed past sprints (throughput only) so the Monte Carlo forecast has history. Mock demo only. */
+export async function seedPastSprints(activeStart: Date): Promise<void> {
+  await prisma.sprint.deleteMany({ where: { provider: "mock", state: "closed", throughput: { not: null } } });
+  for (let i = 0; i < PAST_THROUGHPUT.length; i++) {
+    const end = new Date(activeStart.getTime() - (i * 14 + 2) * DAY_MS);
+    const start = new Date(end.getTime() - 13 * DAY_MS);
+    await prisma.sprint.create({
+      data: { id: `past-sprint-${i + 1}`, name: `Payments Sprint ${12 - i}`, goal: "", start, end, state: "closed", provider: "mock", throughput: PAST_THROUGHPUT[i] },
+    });
+  }
+}
+
 /** Plant a self-contained red build snapshot for the sprint's blocked item (mock demo only). */
 export async function seedBlockedBuild(goalId = "main-build-green"): Promise<void> {
   await prisma.goalCheck.deleteMany({ where: { ref: SPRINT_BUILD_REF } });

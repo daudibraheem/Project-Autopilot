@@ -288,11 +288,12 @@ model Sprint {
   goal     String         @default("")
   start    DateTime
   end      DateTime
-  state    String // active | closed
-  provider String // mock | jira
-  syncedAt DateTime       @default(now())
-  items    WorkItem[]
-  briefs   StandupBrief[]
+  state      String // active | closed
+  provider   String // mock | jira
+  throughput Float? // story points completed (closed past sprints; used by the forecast)
+  syncedAt   DateTime       @default(now())
+  items      WorkItem[]
+  briefs     StandupBrief[]
 
   @@index([state])
 }
