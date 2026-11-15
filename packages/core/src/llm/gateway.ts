@@ -33,6 +33,8 @@ export interface GatewayOptions {
   provider?: LlmProviderName;
   maxAttempts?: number;
   baseDelayMs?: number;
+  /** Runs before the request leaves the harness (e.g. the real-name guard). Throw to block it. */
+  beforeSend?: (req: CompleteRequest) => Promise<void> | void;
 }
 
 export async function complete(req: CompleteRequest, opts: GatewayOptions = {}): Promise<LlmResponse> {
@@ -42,6 +44,7 @@ export async function complete(req: CompleteRequest, opts: GatewayOptions = {}):
   const maxAttempts = opts.maxAttempts ?? 3;
   const baseDelay = opts.baseDelayMs ?? 800;
   const started = Date.now();
+  await opts.beforeSend?.(req);
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {

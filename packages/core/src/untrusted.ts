@@ -37,6 +37,9 @@ export const INJECTION_PATTERNS: { name: string; re: RegExp }[] = [
   { name: "addressed-to-ai", re: /\b(AI|LLM) (agents?|assistants?|models?)( reading this)?\s*[:,]/i },
   { name: "disable-safety", re: /\b(disable|bypass|turn off) (the )?(policy|sandbox|safety|guardrails?|verifier)\b/i },
   { name: "exfiltrate", re: /\b(send|post|upload) (the )?(secrets?|tokens?|env|\.env|credentials)\b/i },
+  { name: "addressed-to-ai", re: /^\s*(AI|LLM|bot|assistant|autopilot|agent)\s*[:,]\s*\S/i },
+  { name: "mass-action", re: /\b(mark|move|close|resolve|delete|transition)\s+(all|every)\s+(the\s+)?(tickets|issues|items|stories|tasks)\b/i },
+  { name: "mass-message", re: /\b(message|email|notify|ping|dm|post to)\s+(the\s+)?(whole|entire|all( of)?( the)?)\s+team\b|\bmessage everyone\b/i },
 ];
 
 export interface InjectionHit {

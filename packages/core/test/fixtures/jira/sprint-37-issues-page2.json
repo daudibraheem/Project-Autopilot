@@ -1,0 +1,23 @@
+{
+  "startAt": 2,
+  "maxResults": 2,
+  "total": 3,
+  "issues": [
+    {
+      "id": "10103",
+      "key": "TEST-13",
+      "fields": {
+        "summary": "Refund docs",
+        "issuetype": { "name": "Task" },
+        "status": { "name": "Done", "statusCategory": { "key": "done" } },
+        "assignee": { "accountId": "acc-2", "displayName": "Sam Ortiz" },
+        "labels": [],
+        "created": "2026-10-30T10:00:00.000Z",
+        "customfield_10016": 1,
+        "description": null,
+        "comment": { "comments": [] }
+      },
+      "changelog": { "histories": [] }
+    }
+  ]
+}

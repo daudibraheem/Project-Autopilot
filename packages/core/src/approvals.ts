@@ -58,6 +58,12 @@ async function afterMerge(reason: string) {
 
 export async function approveJob(jobId: string, actor: "human" | "system" = "human", note?: string) {
   const job = await pendingJob(jobId);
+  if (job.jobType === "standup-brief") {
+    const { publishBrief } = await import("./sprint/team-pipeline");
+    await audit({ actor, action: "approval.approved", target: jobId, jobId, details: { kind: "brief", note } });
+    return publishBrief(jobId, actor, note ?? "approved by human");
+  }
+  if (job.jobType === "nudge-draft") throw new ApprovalError("Nudges are approved one draft at a time (Approve / Edit / Discard on each draft)");
   await prisma.approvalDecision.create({ data: { jobId, attempt: job.attempt, decision: "approve", reason: note ?? null, actor } });
   await audit({ actor, action: "approval.approved", target: jobId, jobId, details: { mode: githubMode() ? "github" : "local", note } });
   let status: string;
@@ -84,6 +90,8 @@ export async function rejectJob(jobId: string, reason: string) {
   if (!reason?.trim()) throw new ApprovalError("A reason is required to reject");
   const job = await pendingJob(jobId);
   await prisma.approvalDecision.create({ data: { jobId, attempt: job.attempt, decision: "reject", reason, actor: "human" } });
+  await prisma.standupBrief.updateMany({ where: { jobId, status: "awaiting_approval" }, data: { status: "rejected" } });
+  await prisma.nudgeDraft.updateMany({ where: { jobId, status: "awaiting_approval" }, data: { status: "discarded", discardReason: reason, decidedAt: new Date() } });
   await prisma.job.update({ where: { id: jobId }, data: { status: "rejected", finishedAt: new Date(), error: `Rejected: ${reason}` } });
   await audit({ actor: "human", action: "approval.rejected", target: jobId, jobId, severity: "warn", details: { reason } });
   const t = await recordTrust(job.jobType, "rejected", jobId, reason);
@@ -118,4 +126,67 @@ export async function autoMergeIfAllowed(jobId: string, changedFiles: string[]):
   await audit({ actor: "system", action: "automerge.l2", target: jobId, jobId, details: { level: trust.level } });
   await approveJob(jobId, "system", "L2 auto-merge (autoMergeAllowed)");
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Nudge drafts (Scrum Mode). Approve = ready to copy. Nothing is ever sent by Autopilot.
+// ---------------------------------------------------------------------------
+
+async function pendingDraft(draftId: string) {
+  const d = await prisma.nudgeDraft.findUnique({ where: { id: draftId } });
+  if (!d) throw new ApprovalError(`Draft ${draftId} not found`);
+  if (d.status !== "awaiting_approval") throw new ApprovalError(`Draft is ${d.status}, not awaiting approval`);
+  await pendingJob(d.jobId);
+  return d;
+}
+
+/** When every draft of a nudge job is decided, close the job and record trust once (capped at L0 forever). */
+async function finalizeNudgeJob(jobId: string) {
+  const drafts = await prisma.nudgeDraft.findMany({ where: { jobId } });
+  if (drafts.some((d) => d.status === "awaiting_approval")) return null;
+  const job = await prisma.job.findUniqueOrThrow({ where: { id: jobId } });
+  const approved = drafts.filter((d) => d.status === "ready_to_send").length;
+  const status = approved > 0 ? "approved" : "rejected";
+  await prisma.job.update({ where: { id: jobId }, data: { status, finishedAt: new Date() } });
+  await prisma.approvalDecision.create({ data: { jobId, attempt: job.attempt, decision: approved ? "approve" : "reject", reason: `${approved}/${drafts.length} draft(s) ready to send`, actor: "human" } });
+  const t = await recordTrust(job.jobType, approved ? "approved" : "rejected", jobId, `${approved}/${drafts.length} nudge draft(s) approved`);
+  const { lessonFor } = await import("./job-steps");
+  await lessonFor(jobId, null, approved ? "pass" : "fail", `${approved}/${drafts.length} nudge drafts approved; discarded: ${drafts.filter((d) => d.status === "discarded").map((d) => d.discardReason).join("; ") || "none"}`).catch(() => {});
+  return { status, trustChange: t.change };
+}
+
+export async function approveNudge(draftId: string) {
+  const d = await pendingDraft(draftId);
+  await prisma.nudgeDraft.update({ where: { id: draftId }, data: { status: "ready_to_send", decidedAt: new Date() } });
+  await audit({
+    actor: "human",
+    action: "nudge.ready_to_send",
+    target: d.itemKey,
+    jobId: d.jobId,
+    details: { draftId, note: "Marked ready to send. Nothing was sent: Autopilot has no messaging capability; a human copies the text." },
+  });
+  return { status: "ready_to_send", text: d.editedText ?? d.text, job: await finalizeNudgeJob(d.jobId) };
+}
+
+export async function editNudge(draftId: string, text: string) {
+  const d = await pendingDraft(draftId);
+  const t = text.trim();
+  if (!t) throw new ApprovalError("Text is required");
+  if (!t.includes(d.itemKey)) throw new ApprovalError(`Keep the draft about the work item: mention ${d.itemKey}`);
+  const { teamTextViolations } = await import("./sprint/team-gate");
+  const { sprintSettings } = await import("./sprint/data");
+  const v = teamTextViolations(t, { realNames: [], forbiddenTerms: (await sprintSettings()).forbiddenTerms });
+  if (v.length) throw new ApprovalError(`Edit blocked by the team data rules: ${v.join("; ")}`);
+  // Real names are allowed here: this is the human's own message and never goes to a model.
+  await prisma.nudgeDraft.update({ where: { id: draftId }, data: { editedText: t } });
+  await audit({ actor: "human", action: "nudge.edited", target: d.itemKey, jobId: d.jobId, details: { draftId } });
+  return { status: "awaiting_approval", text: t };
+}
+
+export async function discardNudge(draftId: string, reason: string) {
+  if (!reason?.trim()) throw new ApprovalError("A reason is required to discard");
+  const d = await pendingDraft(draftId);
+  await prisma.nudgeDraft.update({ where: { id: draftId }, data: { status: "discarded", discardReason: reason, decidedAt: new Date() } });
+  await audit({ actor: "human", action: "nudge.discarded", target: d.itemKey, jobId: d.jobId, details: { draftId, reason } });
+  return { status: "discarded", job: await finalizeNudgeJob(d.jobId) };
 }

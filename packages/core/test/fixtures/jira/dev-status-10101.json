@@ -1,0 +1,10 @@
+{
+  "errors": [],
+  "detail": [
+    {
+      "pullRequests": [
+        { "id": "#41", "name": "Refund API", "url": "https://github.com/acme/payments/pull/41", "status": "OPEN", "lastUpdate": "2026-11-05T12:00:00.000+0000", "reviewers": [] }
+      ]
+    }
+  ]
+}

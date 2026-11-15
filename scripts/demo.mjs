@@ -107,7 +107,7 @@ run("pnpm", ["--filter", "@autopilot/db", "migrate:deploy"]);
 
 step("3/7 Resetting the database (Autopilot tables + job queue only)");
 // Empties only this app's own tables in the local docker-compose database (see DECISIONS #24).
-const TABLES = ["GoalCheck", "Job", "Contract", "JobStep", "VerifierReport", "GateResult", "ApprovalDecision", "TrustRecord", "TrustEvent", "Lesson", "AuditEvent", "Setting", "MlModel", "MlPrediction"];
+const TABLES = ["GoalCheck", "Job", "Contract", "JobStep", "VerifierReport", "GateResult", "ApprovalDecision", "TrustRecord", "TrustEvent", "Lesson", "AuditEvent", "Setting", "MlModel", "MlPrediction", "NudgeDraft", "StandupBrief", "WorkItemEvent", "WorkItem", "Sprint", "PersonAlias"];
 const resetSql = `DROP SCHEMA IF EXISTS pgboss CASCADE; TRUNCATE ${TABLES.map((t) => `"${t}"`).join(", ")} CASCADE;`;
 run("docker", ["compose", "exec", "-T", "db", "psql", "-v", "ON_ERROR_STOP=1", "-U", "autopilot", "-d", dbName(), "-qc", resetSql], { quiet: true });
 rmSync(path.join(ROOT, ".autopilot"), { recursive: true, force: true });
@@ -140,6 +140,15 @@ ${c.bold}Project Autopilot is ready.${c.reset}  Open ${c.bold}http://localhost:3
   6. Trust ledger, Lessons and per-job cost. For a promotion:  ${c.bold}pnpm cli seed --reintroduce g1${c.reset}
      → "Check goals now" → G1 "Run job" → approve; repeat once more → L0 → L1.
   7. Flip the kill switch. "Run job" is refused.
+
+${c.bold}Scrum Mode${c.reset} (docs/DEMO_SCRIPT.md, part 2; best right after this reset, while G2 is still red)
+  1. ${c.bold}pnpm cli seed-sprint${c.reset} → Overview "Team health": S1 and S2 red.
+  2. Sprint page: stuck items with reason codes; "Waiting for QA" not flagged; Autopilot agent badges.
+  3. Standup → "Generate brief now" → Approvals → "Approve and publish". S1 turns green.
+  4. S2 "Draft nudges" → Approvals: approve one draft, "Copy text". Nothing is sent.
+  5. Audit log: the ticket comment's instruction was flagged and ignored.
+  6. ${c.bold}pnpm cli demo-bad-brief${c.reset} → gate and verifier block it.
+  7. Ask Autopilot: "What's stuck and why?" → cited answer.
 `;
 
 if (prepareOnly) {

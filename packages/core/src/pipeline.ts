@@ -9,18 +9,17 @@ import { Prisma, prisma } from "@autopilot/db";
 import { simpleGit } from "simple-git";
 import { audit } from "./audit";
 import { getConfig, githubMode, isDemoTarget } from "./config";
-import { Contract, GOAL_LABEL, type GoalId } from "./contract";
+import { type Contract, GOAL_LABEL, type GoalId, isTeamJobType } from "./contract";
 import { renderTask, type UntrustedAttachment, type WorkerTask } from "./agents/task";
 import { annotateEvidence, type EvidenceItem, executeTool, TOOL_SPECS } from "./agents/tools";
 import { runVerifier, type VerifierReport } from "./agents/verifier";
-import { type Checkpoint, runAgentLoop, type StepRecord, workerSystemPrompt } from "./agents/worker";
+import { type Checkpoint, runAgentLoop, workerSystemPrompt } from "./agents/worker";
 import { runGate } from "./gate";
 import { checkGoal } from "./goals/index";
 import { commitWorkspace, prepareWorkspace, pushBranch, recentCommits, showCommit, workspaceDiff, workspacePath } from "./git";
 import { complete } from "./llm/gateway";
 import { routeModels } from "./llm/router";
-import type { LlmResponse } from "./llm/types";
-import { loadLessons, searchLessons, writeLesson } from "./lessons";
+import { loadLessons, searchLessons } from "./lessons";
 import { decide, failureRateFor, type FlakyDecision, loadFlakyModel, predictFlaky } from "./ml/flaky";
 import { FLAKY_SEEDS, parseTap, runAtRef, runInSandbox, TEST_COMMAND, testKey } from "./sandbox";
 import { parseCsv } from "./seed/ci-history";
@@ -29,99 +28,9 @@ import { recordTrust, getTrust } from "./trust";
 import { untrustedBlocks } from "./untrusted";
 import { autoMergeIfAllowed, publishDraftPr } from "./approvals";
 
-export const TERMINAL_STATUSES = ["merged", "approved", "rejected", "gate_failed", "failed", "budget_exceeded", "killed"];
+import { addUsage, contractFromRow, finish, lessonFor, loadJob, StepRecorder, TERMINAL_STATUSES } from "./job-steps";
 
-// ---------------- step recording ----------------
-
-class StepRecorder {
-  private index = 0;
-  constructor(
-    private jobId: string,
-    private attempt: number,
-  ) {}
-  async init() {
-    const last = await prisma.jobStep.findFirst({ where: { jobId: this.jobId }, orderBy: { index: "desc" } });
-    this.index = (last?.index ?? 0) + 1;
-  }
-  async record(phase: string, s: StepRecord) {
-    await prisma.jobStep.create({
-      data: {
-        jobId: this.jobId,
-        attempt: this.attempt,
-        index: this.index++,
-        phase,
-        kind: s.kind,
-        tool: s.tool ?? null,
-        status: s.status,
-        inputSummary: s.inputSummary ?? null,
-        outputSummary: s.outputSummary ?? null,
-        model: s.model ?? null,
-        provider: s.provider ?? null,
-        tokensIn: s.tokensIn ?? 0,
-        tokensOut: s.tokensOut ?? 0,
-        costUsd: s.costUsd ?? 0,
-        durationMs: s.durationMs ?? 0,
-        checkpoint: s.checkpoint ? (JSON.parse(JSON.stringify(s.checkpoint)) as object) : undefined,
-      },
-    });
-  }
-  async llm(phase: string, r: LlmResponse, inputSummary: string) {
-    await this.record(phase, {
-      kind: "llm",
-      status: "ok",
-      model: r.model,
-      provider: r.provider + (r.degraded ? " (degraded)" : ""),
-      tokensIn: r.usage.inputTokens,
-      tokensOut: r.usage.outputTokens,
-      costUsd: r.costUsd,
-      durationMs: r.latencyMs,
-      inputSummary,
-      outputSummary: r.text.slice(0, 1500),
-    });
-  }
-  note(phase: string, text: string, status: StepRecord["status"] = "ok", durationMs = 0) {
-    return this.record(phase, { kind: "note", status, outputSummary: text, durationMs });
-  }
-}
-
-async function addUsage(jobId: string, r: { usage: { inputTokens: number; outputTokens: number }; costUsd: number; degraded?: boolean }) {
-  await prisma.job.update({
-    where: { id: jobId },
-    data: {
-      tokensIn: { increment: r.usage.inputTokens },
-      tokensOut: { increment: r.usage.outputTokens },
-      costUsd: { increment: r.costUsd },
-      ...(r.degraded ? { degraded: true } : {}),
-    },
-  });
-}
-
-async function finish(jobId: string, status: string, error?: string) {
-  await prisma.job.update({ where: { id: jobId }, data: { status, finishedAt: new Date(), ...(error ? { error } : {}) } });
-  await audit({ actor: "system", action: `job.${status}`, target: jobId, jobId, severity: status === "merged" || status === "awaiting_approval" ? "info" : "warn", details: error ? { error } : {} });
-}
-
-function contractFromRow(row: NonNullable<Awaited<ReturnType<typeof loadJob>>>["contract"], jobId: string): Contract {
-  return Contract.parse({
-    jobId,
-    goalId: row!.goalId,
-    jobType: row!.jobType,
-    difficulty: row!.difficulty,
-    allowedPaths: row!.allowedPaths,
-    forbiddenPaths: row!.forbiddenPaths,
-    maxSteps: row!.maxSteps,
-    maxTokens: row!.maxTokens,
-    maxUsd: row!.maxUsd,
-    maxMinutes: row!.maxMinutes,
-    doneCriteria: row!.doneCriteria,
-    riskLevel: row!.riskLevel,
-    allowRegistry: row!.allowRegistry,
-  });
-}
-
-function loadJob(jobId: string) {
-  return prisma.job.findUnique({ where: { id: jobId }, include: { contract: true } });
-}
+export { lessonFor, TERMINAL_STATUSES };
 
 // ---------------- task building (plain code) ----------------
 
@@ -299,6 +208,10 @@ async function buildTask(
 export async function runJob(jobId: string): Promise<void> {
   const job = await loadJob(jobId);
   if (!job?.contract) return;
+  if (isTeamJobType(job.jobType)) {
+    const { runTeamJob } = await import("./sprint/team-pipeline");
+    return runTeamJob(jobId);
+  }
   if (TERMINAL_STATUSES.includes(job.status) || job.status === "awaiting_approval") return;
   const cfg = getConfig();
   const contract = contractFromRow(job.contract, jobId);
@@ -501,23 +414,6 @@ export async function runJob(jobId: string): Promise<void> {
       else throw e;
     }
   }
-}
-
-/** Write the lesson for a finished job (LLM call, mock in mock mode). */
-export async function lessonFor(jobId: string, rec: StepRecorder | null, result: "pass" | "fail", evidence: string, failedGateChecks: string[] = [], verifierConcerns: string[] = []) {
-  const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) return;
-  const r = new StepRecorder(jobId, job.attempt);
-  if (!rec) await r.init();
-  const recorder = rec ?? r;
-  const out = await writeLesson(
-    { jobId, jobType: job.jobType, goalId: job.goalId, result, evidence, failedGateChecks, verifierConcerns, highlights: [job.explanation?.slice(0, 200) ?? ""] },
-    async (resp) => {
-      await addUsage(jobId, resp);
-      await recorder.llm("lesson", resp, "Summarise the outcome into one lesson");
-    },
-  );
-  await recorder.note("lesson", out.duplicate ? `Lesson already known: ${out.lesson.lesson}` : `Lesson saved: ${out.lesson.lesson} · next time: ${out.lesson.nextTime}`);
 }
 
 export { untrustedBlocks };

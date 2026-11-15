@@ -1,0 +1,15 @@
+{
+  "name": "@autopilot/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": { "autopilot-mcp": "src/index.ts" },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@autopilot/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.0"
+  }
+}

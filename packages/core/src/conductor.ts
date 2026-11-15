@@ -5,7 +5,7 @@
 import { prisma } from "@autopilot/db";
 import { audit } from "./audit";
 import { isDemoTarget, MAX_OPEN_JOBS } from "./config";
-import { buildContract, GOAL_IDS, GOAL_JOB_TYPE, type GoalId } from "./contract";
+import { ALL_GOAL_IDS, buildContract, GOAL_JOB_TYPE, type GoalId } from "./contract";
 import { newJobId } from "./ids";
 import { enqueueRunJob } from "./queue";
 import { getSetting, isKillSwitchOn } from "./settings";
@@ -113,14 +113,14 @@ export async function conduct(redGoals: GoalId[], source = "goal-check"): Promis
 }
 
 /** "Run job" button / `pnpm cli run <goal>`: start a job for one goal. Throws on kill switch / duplicates / cap. */
-export async function startJobForGoal(goalId: GoalId, source = "manual"): Promise<string> {
-  if (!GOAL_IDS.includes(goalId)) throw new Error(`Unknown goal ${goalId}`);
+export async function startJobForGoal(goalId: GoalId, source = "manual", opts: { allowGreen?: boolean } = {}): Promise<string> {
+  if (!ALL_GOAL_IDS.includes(goalId)) throw new Error(`Unknown goal ${goalId}`);
   if (await isKillSwitchOn()) {
     await audit({ actor: "conductor", action: "job.refused", target: goalId, severity: "denied", details: { reason: "Kill switch is on" } });
     throw new KillSwitchError();
   }
-  const latest = await prisma.goalCheck.findFirst({ where: { goalId, ref: "main" }, orderBy: { createdAt: "desc" } });
-  if (latest && latest.status === "green") throw new Error(`${goalId} is green; nothing to fix`);
+  const latest = await prisma.goalCheck.findFirst({ where: { goalId, ref: { in: ["main", "sprint"] } }, orderBy: { createdAt: "desc" } });
+  if (latest && latest.status === "green" && !opts.allowGreen) throw new Error(`${goalId} is green; nothing to fix`);
   const plan = await conduct([goalId], source);
   if (plan.jobIds[0]) return plan.jobIds[0];
   throw new Error(plan.skipped[0]?.reason ?? "Job not created");

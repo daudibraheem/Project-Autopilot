@@ -2,7 +2,10 @@
 import { prisma } from "@autopilot/db";
 import { getConfig, githubMode } from "./config";
 import { OPEN_STATUSES } from "./conductor";
-import { GOAL_LABEL, JOB_TYPES } from "./contract";
+import { GOAL_LABEL, isTeamJobType, JOB_TYPES, TEAM_GOAL_IDS } from "./contract";
+import { aliasMapForUi } from "./sprint/pseudonym";
+import { teamJobExtras } from "./sprint/queries";
+import { TEAM_GATE_LABELS } from "./sprint/team-gate";
 import { GATE_LABELS } from "./gate";
 import { goalOverview } from "./goals/index";
 import { routeModels } from "./llm/router";
@@ -41,8 +44,9 @@ export async function systemInfo() {
 }
 
 export async function overviewData() {
-  const [goals, openJobs, todayCost, info] = await Promise.all([
+  const [goals, teamGoals, openJobs, todayCost, info] = await Promise.all([
     goalOverview(),
+    goalOverview(TEAM_GOAL_IDS),
     prisma.job.findMany({ where: { status: { in: OPEN_STATUSES } }, select: { id: true, goalId: true, status: true } }),
     prisma.jobStep.aggregate({ where: { createdAt: { gte: startOfToday() } }, _sum: { costUsd: true } }),
     systemInfo(),
@@ -50,6 +54,7 @@ export async function overviewData() {
   const lastCheck = await prisma.goalCheck.findFirst({ orderBy: { createdAt: "desc" }, select: { createdAt: true } });
   return {
     goals,
+    teamGoals,
     openJobs,
     openJobCount: openJobs.length,
     todayCostUsd: todayCost._sum.costUsd ?? 0,
@@ -97,8 +102,9 @@ export async function jobDetail(id: string) {
     ...job,
     steps,
     goalLabel: GOAL_LABEL[job.goalId as keyof typeof GOAL_LABEL] ?? job.goalId,
-    gateResults: job.gateResults.filter((g) => g.attempt === job.attempt).map((g) => ({ ...g, label: GATE_LABELS[g.name] ?? g.name })),
+    gateResults: job.gateResults.filter((g) => g.attempt === job.attempt).map((g) => ({ ...g, label: GATE_LABELS[g.name] ?? TEAM_GATE_LABELS[g.name] ?? g.name })),
     audit,
+    team: isTeamJobType(job.jobType) ? { ...(await teamJobExtras(job.id)), people: await aliasMapForUi() } : null,
     trust: { ...trust, label: LEVEL_LABEL[trust.level] },
   };
 }

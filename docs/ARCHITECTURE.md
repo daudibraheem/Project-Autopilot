@@ -162,3 +162,51 @@ The LLM is only called in the uncertain band (0.3 < p < 0.7), where reading the 
 - Every call records provider, pinned model ID, input/output tokens, estimated USD (`llm/pricing.ts`) and latency in `JobStep`.
 - Model IDs come from config and are recorded on every trace.
 - Mock mode records the configured model IDs with `provider = mock`. Its token counts are estimated as characters ÷ 4, so cost figures in mock mode are **estimates of what the run would have cost**.
+
+---
+
+## 8. Scrum Mode: what is reused vs new
+
+Scrum Mode runs on the **same engine**. A team job is just another contract and job type: same conductor, worker loop, verifier core, gate pattern, approvals, trust ledger, lessons, audit log, budgets and kill switch.
+
+```mermaid
+flowchart LR
+  P[SprintProvider<br/>mock | Jira GET-only] -->|sync: pseudonymise,<br/>flag injections| DB[(Sprint / WorkItem /<br/>WorkItemEvent / PersonAlias)]
+  DB --> S[S1 · S2 goals<br/>plain code]
+  S -->|red| C[Conductor<br/>contract + budget]
+  C --> F[Facts builder<br/>plain code]
+  F --> W[Worker loop<br/>words the facts]
+  W -->|real-name guard| G[(Model gateway)]
+  W --> V[Team verifier<br/>different model]
+  V --> TG[Team gate<br/>plain code]
+  TG --> A[Approvals<br/>publish brief / copy nudge]
+  A --> T[Trust ledger<br/>nudge-draft capped L0]
+  A --> L[Lessons]
+  DB --> M[MCP server<br/>get_sprint · list_work_items · get_item_events]
+  M --> Q[Ask Autopilot]
+```
+
+| Concern | Reused | New (module) |
+|---|---|---|
+| Standing goals | `goals/index.ts` registry, `GoalCheck`, hours-broken, daily cron | `goals/team.ts` (S1 `standup-brief-ready`, S2 `no-stuck-work`) |
+| Contracts + conductor | `contract.ts`, `conductor.ts` (dedupe, cap 3, kill switch) | team contracts (`standup-brief`, `nudge-draft`) in `contract.ts` |
+| Worker | `agents/worker.ts` `runAgentLoop` (budgets, kill switch, checkpoints) | `sprint/facts.ts` (facts first), `sprint/brief.ts` (prompts + zod schemas), `sprint/team-pipeline.ts` |
+| Verifier | `agents/verifier.ts` review core (different model, strict JSON) | team mode: `runTeamVerifier`, `TEAM_VERIFIER_SYSTEM_PROMPT` |
+| Gate | `gate.ts` `GateCheck`, `checkBudget` | `sprint/team-gate.ts` (sources, counts, people, names, injection) |
+| Approvals | `approvals.ts` approve / reject / request changes | brief publish, `approveNudge` / `editNudge` / `discardNudge` |
+| Trust | `trust.ts` ledger + history | `policy.HARD_TRUST_CAPS` (`nudge-draft` = L0 forever) |
+| Lessons, audit, steps | `lessons.ts`, `audit.ts`, `job-steps.ts` | team lesson scripts |
+| Model gateway | `llm/gateway.ts` | `beforeSend` hook → `realNameGuard` |
+| Policy | `policy.ts` | `checkPeopleJudgement`, `checkNoRealNames`, `checkHttpMethod`, `trustCap` |
+| Untrusted data | `untrusted.ts` | patterns for "AI: …", mass actions, mass messages |
+| Sprint data | (none) | `sprint/types.ts`, `sprint/mock-provider.ts`, `sprint/jira-http.ts`, `sprint/jira-provider.ts`, `sprint/sync.ts`, `sprint/pseudonym.ts`, `sprint/stuck.ts`, `sprint/data.ts` |
+| Tools for questions | (none) | `sprint/mcp.ts` (MCP server), `packages/mcp` (stdio), `sprint/ask.ts` (in-process MCP client) |
+| Dashboard | Overview, Approvals, Jobs, Trust | Team health row, `/sprint`, `/standup`, `/ask`, Brief/Nudge cards |
+
+**Concept mapping:**
+- **Think:** brief/nudge worker and team verifier.
+- **Know:** sprint tables and facts.
+- **Do:** publish to the dashboard, copy-only nudges.
+- **Steer:** team rules in `policy.ts`, approvals, the L0 cap.
+
+**Never let AI grade its own homework** still holds: a different model verifies, and the team gate recomputes counts from the database and checks every source.

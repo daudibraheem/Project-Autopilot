@@ -3,6 +3,7 @@ import Link from "next/link";
 import { use } from "react";
 import { ApprovalActions } from "@/components/ApprovalActions";
 import { ContractView, Diff, EvidenceList, GateChecklist, Timeline, VerifierView } from "@/components/job";
+import { BriefView, Counts, NudgeCard } from "@/components/team";
 import { ErrorNote, JobStatus, Loading, Mono, Section } from "@/components/ui";
 import { dateTime, usd } from "@/lib/format";
 import type { JobDetail, SystemInfo } from "@/lib/types";
@@ -55,12 +56,18 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
         </dl>
       </div>
 
-      {job.status === "awaiting_approval" && (
+      {job.status === "awaiting_approval" && job.jobType !== "nudge-draft" && (
         <div className="mb-6 rounded-xl border border-warn/40 bg-warn-bg/50 p-5">
           <p className="mb-3 text-sm">
             <strong>Your decision.</strong> The verifier passed it and every gate check is green. Nothing reaches <Mono>main</Mono> until you approve.
           </p>
-          <ApprovalActions jobId={job.id} attempt={job.attempt} githubMode={sys?.githubMode} onDone={refresh} />
+          <ApprovalActions
+            jobId={job.id}
+            attempt={job.attempt}
+            githubMode={sys?.githubMode}
+            onDone={refresh}
+            approveLabel={job.jobType === "standup-brief" ? "Approve and publish" : undefined}
+          />
         </div>
       )}
       {job.error && !["merged", "approved"].includes(job.status) && <p className="mb-6 rounded-lg bg-bad-bg px-4 py-3 text-sm text-bad">{job.error}</p>}
@@ -89,14 +96,39 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
           <Section title="Step timeline" aside={["running", "verifying", "gating", "queued"].includes(job.status) ? "Live · refreshes every 2 s" : `${job.steps.length} steps`}>
             <Timeline steps={job.steps} />
           </Section>
-          <Section title="Diff" aside={job.branch}>
-            <Diff diff={job.diff} />
-          </Section>
+          {job.team ? (
+            job.jobType === "standup-brief" ? (
+              <Section title="Standup brief" aside={job.team.brief ? `status: ${job.team.brief.status}` : undefined}>
+                {job.team.brief?.content?.sections ? (
+                  <div className="space-y-5">
+                    <BriefView content={job.team.brief.content} people={job.team.people} />
+                    <div className="border-t border-line pt-4">
+                      <Counts counts={job.team.brief.content.counts} label="As written by the worker; the gate compares them with the database." />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">No valid brief output.</p>
+                )}
+              </Section>
+            ) : (
+              <Section title="Nudge drafts" aside="drafts only · nothing is sent">
+                <div className="space-y-3">
+                  {job.team.nudges.map((n) => (
+                    <NudgeCard key={n.id} n={n} people={job.team!.people} onDone={refresh} />
+                  ))}
+                </div>
+              </Section>
+            )
+          ) : (
+            <Section title="Diff" aside={job.branch}>
+              <Diff diff={job.diff} />
+            </Section>
+          )}
           <Section title="Gate checklist" aside="Plain code, no AI">
             <GateChecklist results={job.gateResults} />
           </Section>
           <Section title="Verifier report" aside={job.verifierModel ? `Different model from the worker (${job.workerModel})` : undefined}>
-            <VerifierView report={report} />
+            <VerifierView report={report} scope={job.team ? "saw the plain-code facts and the output only (pseudonymised)" : undefined} />
           </Section>
         </div>
         <div className="space-y-6">

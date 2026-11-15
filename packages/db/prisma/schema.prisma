@@ -242,3 +242,110 @@ model MlPrediction {
 
   @@index([createdAt])
 }
+
+// ---------------------------------------------------------------------------
+// Scrum Mode: normalised sprint data (pseudonymised; real names only in PersonAlias)
+// ---------------------------------------------------------------------------
+
+model Sprint {
+  id       String         @id
+  name     String
+  goal     String         @default("")
+  start    DateTime
+  end      DateTime
+  state    String // active | closed
+  provider String // mock | jira
+  syncedAt DateTime       @default(now())
+  items    WorkItem[]
+  briefs   StandupBrief[]
+
+  @@index([state])
+}
+
+model WorkItem {
+  id                    String   @id @default(cuid())
+  key                   String   @unique
+  sprintId              String
+  sprint                Sprint   @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  title                 String
+  description           String   @default("") @db.Text
+  type                  String
+  status                String
+  statusCategory        String // todo | in_progress | done
+  storyPoints           Float?
+  labels                String[]
+  assigneeRef           String? // pseudonym, e.g. "Member A"
+  createdAt             DateTime
+  statusChangedAt       DateTime
+  lastActivityAt        DateTime
+  linkedPrUrls          String[]
+  linkedCommitShas      String[]
+  pullRequests          Json     @default("[]") // [{ url, state, openedAt, firstReviewAt }]
+  linkedGoalId          String? // e.g. main-build-green (blocked_by_build)
+  isAgentWork           Boolean  @default(false)
+  autopilotJobId        String?
+  addedAfterSprintStart Boolean  @default(false)
+  syncedAt              DateTime @default(now())
+
+  @@index([sprintId, statusCategory])
+}
+
+model WorkItemEvent {
+  id        String   @id
+  itemKey   String
+  kind      String // status_change | comment | assignment | created | sprint_added
+  at        DateTime
+  actorRef  String? // pseudonym
+  fromValue String?
+  toValue   String?
+  body      String?  @db.Text
+  flagged   Boolean  @default(false) // injection-like content: never usable as a source
+
+  @@index([itemKey, at])
+  @@index([at])
+}
+
+/// realName ↔ pseudonym. UI use only: never sent to a model.
+model PersonAlias {
+  id         String   @id @default(cuid())
+  provider   String
+  externalId String
+  realName   String
+  pseudonym  String   @unique
+  createdAt  DateTime @default(now())
+
+  @@unique([provider, externalId])
+}
+
+model StandupBrief {
+  id          String    @id @default(cuid())
+  sprintId    String
+  sprint      Sprint    @relation(fields: [sprintId], references: [id], onDelete: Cascade)
+  date        String // YYYY-MM-DD (local)
+  jobId       String?
+  status      String // awaiting_approval | published | rejected | blocked
+  content     Json
+  facts       Json
+  publishedAt DateTime?
+  publishedBy String?
+  createdAt   DateTime  @default(now())
+
+  @@index([date, status])
+}
+
+model NudgeDraft {
+  id            String    @id @default(cuid())
+  jobId         String
+  itemKey       String
+  reasonCode    String
+  text          String    @db.Text
+  sources       String[]
+  status        String // awaiting_approval | ready_to_send | discarded
+  editedText    String?   @db.Text
+  discardReason String?
+  decidedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([jobId])
+  @@index([status])
+}

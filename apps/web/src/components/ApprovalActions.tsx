@@ -5,7 +5,21 @@ import { Button, cx } from "./ui";
 
 type Mode = null | "reject" | "changes";
 
-export function ApprovalActions({ jobId, attempt, githubMode, onDone }: { jobId: string; attempt: number; githubMode?: boolean; onDone: () => void }) {
+export function ApprovalActions({
+  jobId,
+  attempt,
+  githubMode,
+  onDone,
+  approveLabel,
+  hideApprove,
+}: {
+  jobId: string;
+  attempt: number;
+  githubMode?: boolean;
+  onDone: () => void;
+  approveLabel?: string;
+  hideApprove?: boolean;
+}) {
   const [mode, setMode] = useState<Mode>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -19,7 +33,7 @@ export function ApprovalActions({ jobId, attempt, githubMode, onDone }: { jobId:
       const r = await post<{ status: string; trustChange?: { kind: string; from: number; to: number } | null }>(`/api/jobs/${jobId}/${kind}`, payload);
       setDone(
         kind === "approve"
-          ? `${r.status === "merged" ? "Merged into main" : "Draft PR marked ready for review"}.${r.trustChange ? ` Trust ${r.trustChange.kind}: L${r.trustChange.from} → L${r.trustChange.to}.` : ""} Goals re-checked.`
+          ? `${r.status === "merged" ? "Merged into main" : r.status === "published" ? "Brief published to the dashboard" : "Draft PR marked ready for review"}.${r.trustChange ? ` Trust ${r.trustChange.kind}: L${r.trustChange.from} → L${r.trustChange.to}.` : ""} Goals re-checked.`
           : kind === "reject"
             ? `Rejected.${r.trustChange ? ` Trust ${r.trustChange.kind}: L${r.trustChange.from} → L${r.trustChange.to}.` : ""}`
             : "Feedback sent. The worker is making one more attempt.",
@@ -39,9 +53,11 @@ export function ApprovalActions({ jobId, attempt, githubMode, onDone }: { jobId:
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <Button variant="primary" busy={busy === "approve"} disabled={Boolean(busy)} onClick={() => act("approve", {})}>
-          {githubMode ? "Approve and mark PR ready" : "Approve and merge"}
-        </Button>
+        {!hideApprove && (
+          <Button variant="primary" busy={busy === "approve"} disabled={Boolean(busy)} onClick={() => act("approve", {})}>
+            {approveLabel ?? (githubMode ? "Approve and mark PR ready" : "Approve and merge")}
+          </Button>
+        )}
         <Button variant="secondary" disabled={Boolean(busy) || attempt >= 2} title={attempt >= 2 ? "Only one extra attempt is allowed" : undefined} onClick={() => setMode(mode === "changes" ? null : "changes")} aria-expanded={mode === "changes"}>
           Request changes
         </Button>

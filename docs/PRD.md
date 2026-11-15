@@ -110,3 +110,70 @@ A false "all clear" on a goal check is the second-worst outcome. That's why goal
 6. `pnpm cli demo-bad-worker`: the policy, the verifier and the gate all block an out-of-scope edit.
 7. The Trust page shows a promotion after repeated passes. Lessons and per-job cost are visible.
 8. With the kill switch on, new jobs refuse to start.
+
+---
+
+# Scrum Mode (round 1)
+
+## Problem
+
+The same rot happens to the team's *work*, not just the code:
+- tickets go quiet for days;
+- pull requests wait for review with no owner;
+- work is blocked by a red build nobody connects it to;
+- scope sneaks in mid-sprint.
+
+Standups spend their time reconstructing this from the board instead of acting on it.
+
+## User
+
+The team on one project: developers, the scrum master and the tech lead.
+
+## Primary metric
+
+**Time blocked work stays blocked.** This is the hours a sprint item spends stuck before it moves again. Secondary metrics:
+- briefs published on time (S1 green at standup);
+- nudge drafts approved vs discarded;
+- the cost per brief.
+
+## What it does
+
+1. **Sprint data:** read-only, from a mock provider or Jira Cloud. People are pseudonymised at sync time.
+2. **Standup brief (S1):** a daily, evidence-backed summary. Plain code builds the facts, the worker LLM only words them, and every sentence cites its sources.
+3. **Stuck-work watch (S2):** plain-code detection with four reason codes (`no_activity`, `review_waiting`, `blocked_by_build`, `blocked_label`). One drafted nudge per stuck item, which a human may copy and send.
+
+## Privacy and team rules (AGENTS.md rules 8–13, enforced in code)
+
+- **Work, not people.** No rankings or comparisons of people, no "slow/lazy/underperforming" judgements, no mood, no guesses at personal reasons. The gate blocks these on every output.
+- **Pseudonymise before the model.** Real names live only in `PersonAlias` and appear only in the UI. A gateway guard refuses any model request that contains a real name.
+- **Nothing reaches a person automatically.** Nudges are drafts. `nudge-draft` is capped at trust L0 forever (a code constant).
+- **Read-only Jira.** GET only. The wrapper throws and audits anything else.
+- **Ticket text is untrusted.** Injection-like comments are flagged and audited at sync and can never be a source.
+- **Least data.** Only the configured project's active sprint, plus the previous sprint for comparison.
+
+## Scope
+
+**In scope:**
+- a mock provider and a read-only Jira Cloud provider;
+- S1/S2 goals, briefs, nudges and Ask Autopilot;
+- a dashboard-only publication.
+
+**Out of scope (round 1):**
+- posting to Slack or Teams;
+- writing to Jira;
+- multiple boards;
+- per-person analytics of any kind (by design, permanently).
+
+## User stories
+
+- **SM1:** As a scrum master, I see stuck items with the reason, so standup starts from facts.
+  *Accepted when:* the Sprint page highlights each stuck item with its reason code, and normal waits (e.g. "Waiting for QA") are not flagged.
+- **SM2:** As the team, we get a short daily brief where every sentence links to its ticket, event or job.
+  *Accepted when:* the gate rejects any unsourced sentence, unknown source, wrong count, judgement of people, real name, or anything derived from a flagged comment.
+- **SM3:** As a tech lead, I review drafted nudges, about work and not people, and copy the ones I want to send.
+  *Accepted when:* Approve marks a draft "ready to send", nothing is sent, and the audit log says so.
+- **SM4:** As anyone, I ask "What's stuck and why?" and get a cited answer.
+
+## Scrum demo success criteria
+
+The 7 Scrum steps in `docs/DEMO_SCRIPT.md` work in mock mode, with no API key, no internet and no Jira.

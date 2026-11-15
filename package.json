@@ -16,8 +16,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "vitest run",
+    "mcp": "pnpm --filter @autopilot/mcp start",
     "eval": "pnpm --filter @autopilot/cli exec tsx src/index.ts eval",
-    "eval:promptfoo": "npx promptfoo@latest eval -c evals/promptfoo.yaml"
+    "eval:promptfoo": "npx promptfoo@latest eval -c evals/promptfoo.yaml",
+    "eval:promptfoo:team": "npx promptfoo@latest eval -c evals/promptfoo-team.yaml"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.5",

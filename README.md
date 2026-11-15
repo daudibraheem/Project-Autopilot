@@ -100,3 +100,56 @@ More detail:
 - [`AGENTS.md`](AGENTS.md): the constitution, enforced in `packages/core/src/policy.ts`.
 - [`docs/PRD.md`](docs/PRD.md) and [`docs/DECISIONS.md`](docs/DECISIONS.md).
 - [`docs/PRESENTATION_OUTLINE.md`](docs/PRESENTATION_OUTLINE.md).
+
+## Scrum Mode
+
+The same engine keeps the team's *work* healthy. It provides:
+- a sprint board view;
+- a cited daily standup brief (S1);
+- plain-code stuck-work detection with drafted nudges that a human sends (S2);
+- Ask Autopilot over a read-only MCP server.
+
+Team rules (AGENTS.md 8–13) are enforced in code:
+- work, not people;
+- pseudonyms before the model;
+- nothing is ever sent automatically;
+- read-only Jira;
+- ticket text is untrusted;
+- least data.
+
+```bash
+pnpm cli seed-sprint          # mock sprint with planted situations → Overview "Team health"
+pnpm cli demo-bad-brief       # scripted blaming/miscounting brief, blocked by gate + verifier
+pnpm cli ask "What's stuck and why?"
+pnpm mcp                      # read-only sprint MCP server on stdio
+```
+
+Walkthrough: `docs/DEMO_SCRIPT.md` part 2.
+
+### Connecting a test Jira project (optional)
+
+Mock mode needs nothing. To read a **test** Jira Cloud project:
+
+1. **Create a separate bot account** with access to **one test project only**. Don't use a personal account.
+2. As that account, create an API token at https://id.atlassian.com/manage-profile/security/api-tokens.
+3. In `.env` (never commit it):
+
+   ```
+   SPRINT_PROVIDER=jira
+   JIRA_BASE_URL=https://yourteam.atlassian.net
+   JIRA_EMAIL=bot@yourteam.example
+   JIRA_API_TOKEN=...
+   JIRA_PROJECT_KEY=TEST
+   JIRA_BOARD_ID=12
+   # JIRA_STORY_POINTS_FIELD=customfield_10016
+   ```
+
+4. Run `pnpm cli jira-check`. It validates the variables and makes one read-only call, printing the sprint name and item count.
+5. Run `pnpm cli sync-sprint`. Team jobs also re-sync at start when `SPRINT_PROVIDER=jira`.
+
+**What the client does and doesn't do:**
+- It only issues `GET` requests. Anything else throws and is audited.
+- It reads only the configured project's active sprint and the previous one.
+- People are pseudonymised before anything reaches a model.
+
+**Before connecting a real team's Jira**, check with your IT/Compliance team. Sprint data names real people and their work, and that is personal data under company policy. For real teams, the recommended path later is Atlassian's official MCP server or OAuth (see `docs/DECISIONS.md` S17).

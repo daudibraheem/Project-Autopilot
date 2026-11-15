@@ -16,6 +16,7 @@ interface TrustData {
     rejections: number;
     gateFailures: number;
     autoMergeAllowed: boolean;
+    cap?: number;
     lastFailureAt: string | null;
     lastFailureReason: string | null;
   }[];
@@ -70,7 +71,9 @@ export default function TrustPage() {
                     <Ladder level={r.level} />
                   </div>
                   <p className="mt-3 text-sm">
-                    {r.level < 2 ? (
+                    {r.cap === 0 ? (
+                      <strong className="text-warn">Capped at L0 forever (hard rule in code): drafts only, a human sends.</strong>
+                    ) : r.level < 2 ? (
                       <>
                         <strong className="tabular-nums">
                           {r.consecutivePasses}/{data.promoteAfter}

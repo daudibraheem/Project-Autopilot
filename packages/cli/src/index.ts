@@ -6,7 +6,7 @@ import { getConfig } from "@autopilot/core/config";
 import { approveJob, rejectJob, requestChanges } from "@autopilot/core/approvals";
 import { checkGoalsAndConduct } from "@autopilot/core/checks";
 import { createJob, startJobForGoal } from "@autopilot/core/conductor";
-import { GOAL_IDS, type GoalId } from "@autopilot/core/contract";
+import { ALL_GOAL_IDS, type GoalId } from "@autopilot/core/contract";
 import { saveFlakyModel, trainFlakyModel } from "@autopilot/core/ml/flaky";
 import { runJob } from "@autopilot/core/pipeline";
 import { stopBoss } from "@autopilot/core/queue";
@@ -15,10 +15,10 @@ import { setKillSwitch } from "@autopilot/core/settings";
 import { prisma } from "@autopilot/db";
 import { runEvals } from "./eval";
 
-const GOAL_ALIASES: Record<string, GoalId> = { g1: "no-critical-vulns", g2: "main-build-green", g3: "setup-docs-work" };
+const GOAL_ALIASES: Record<string, GoalId> = { g1: "no-critical-vulns", g2: "main-build-green", g3: "setup-docs-work", s1: "standup-brief-ready", s2: "no-stuck-work" };
 const toGoal = (g: string): GoalId => {
   const id = GOAL_ALIASES[g.toLowerCase()] ?? (g as GoalId);
-  if (!GOAL_IDS.includes(id)) throw new Error(`Unknown goal "${g}" (use g1, g2, g3)`);
+  if (!ALL_GOAL_IDS.includes(id)) throw new Error(`Unknown goal "${g}" (use g1, g2, g3, s1, s2)`);
   return id;
 };
 
@@ -148,6 +148,60 @@ program
     console.log(`Running scripted bad worker as job ${jobId} …`);
     await runJob(jobId);
     await printJob(jobId);
+  });
+
+program
+  .command("demo-bad-brief")
+  .description("Scrum Mode: scripted worker that blames a person and miscounts; shows the gate and verifier blocking it")
+  .action(async () => {
+    const jobId = await createJob("standup-brief-ready", "demo-bad-brief", { enqueue: false });
+    console.log(`Running scripted bad brief as job ${jobId} …`);
+    await runJob(jobId);
+    await printJob(jobId);
+  });
+
+program
+  .command("ask <question...>")
+  .description('Scrum Mode: ask a sprint question, e.g. pnpm cli ask "What\'s stuck and why?"')
+  .action(async (question: string[]) => {
+    const { askAutopilot } = await import("@autopilot/core/sprint/ask");
+    const r = await askAutopilot(question.join(" "));
+    console.log(`${r.answer}\n`);
+    console.log(`tools: ${r.toolCalls.join(" → ")}`);
+    for (const c of r.checks) console.log(`${c.passed ? "✓" : "✗"} ${c.name}: ${c.detail}`);
+  });
+
+program
+  .command("seed-sprint")
+  .description("Scrum Mode: seed one active sprint (~20 items) with the planted situations (mock provider)")
+  .action(async () => {
+    const { clearSprintData, syncSprint } = await import("@autopilot/core/sprint/sync");
+    const { agentJobIdsForMock } = await import("@autopilot/core/sprint/provider");
+    const { MockSprintProvider } = await import("@autopilot/core/sprint/mock-provider");
+    await clearSprintData({ aliases: true });
+    const r = await syncSprint(new MockSprintProvider({ agentJobIds: await agentJobIdsForMock() }));
+    console.log(`Seeded "${r.sprint?.name}" (+ previous "${r.previous?.name}"): ${r.items} items, ${r.events} events, ${r.flagged.length} injection comment(s) flagged`);
+    const { runGoalChecks, TEAM_GOAL_IDS } = await import("@autopilot/core/goals/index");
+    for (const g of await runGoalChecks(TEAM_GOAL_IDS, "seed-sprint")) console.log(`${g.status.padEnd(5)} ${g.goalId.padEnd(20)} ${g.summary}`);
+  });
+
+program
+  .command("sync-sprint")
+  .description("Scrum Mode: sync the active sprint from SPRINT_PROVIDER (mock | jira, read-only)")
+  .action(async () => {
+    const { syncConfiguredSprint } = await import("@autopilot/core/sprint/provider");
+    const r = await syncConfiguredSprint();
+    console.log(`Synced "${r.sprint?.name ?? "(no active sprint)"}": ${r.items} items, ${r.events} events, ${r.flagged.length} flagged`);
+  });
+
+program
+  .command("jira-check")
+  .description("Validate the Jira env vars and make one read-only call (prints sprint name and item count)")
+  .action(async () => {
+    const { jiraCheck } = await import("@autopilot/core/sprint/jira-check");
+    const r = await jiraCheck();
+    console.log(r.message);
+    if (!r.ok) process.exitCode = 1;
   });
 
 program
