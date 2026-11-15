@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { use } from "react";
 import { ApprovalActions } from "@/components/ApprovalActions";
-import { ContractView, Diff, EvidenceList, GateChecklist, Timeline, VerifierView } from "@/components/job";
+import { ContextBar, ContractView, Diff, EvidenceList, GateChecklist, RepoMapView, Timeline, VerifierView } from "@/components/job";
+import { ModeBadge } from "@/components/modes";
 import { BriefView, Counts, NudgeCard } from "@/components/team";
 import { ErrorNote, JobStatus, Loading, Mono, Section } from "@/components/ui";
 import { dateTime, usd } from "@/lib/format";
@@ -30,6 +31,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
           <h1 className="text-2xl font-semibold tracking-tight">{job.goalLabel}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted">
             <JobStatus status={job.status} />
+            <ModeBadge source={job.source} />
             <span>{job.jobType}</span>
             <Mono>{job.branch}</Mono>
             {job.attempt > 1 && <span>attempt {job.attempt}</span>}
@@ -93,6 +95,14 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
               {job.feedback && <p className="mt-3 text-sm text-muted">Reviewer feedback for this attempt: “{job.feedback}”</p>}
             </Section>
           )}
+          {(() => {
+            const ctx = job.steps.find((s) => s.context && s.context.length > 0)?.context;
+            return ctx ? (
+              <Section title="What the model saw" aside="Context builder · tokens per section">
+                <ContextBar sections={ctx} />
+              </Section>
+            ) : null;
+          })()}
           <Section title="Step timeline" aside={["running", "verifying", "gating", "queued"].includes(job.status) ? "Live · refreshes every 2 s" : `${job.steps.length} steps`}>
             <Timeline steps={job.steps} />
           </Section>
@@ -135,6 +145,11 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
           <Section title="Contract">
             <ContractView c={job.contract} />
           </Section>
+          {job.analysis?.repoMap && (
+            <Section title="Codebase map" aside="repo_map tool">
+              <RepoMapView map={job.analysis.repoMap} />
+            </Section>
+          )}
           <Section title="Evidence" aside="Commands, exit codes, denials">
             <EvidenceList evidence={job.evidence} />
           </Section>

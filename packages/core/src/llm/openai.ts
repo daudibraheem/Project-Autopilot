@@ -37,6 +37,7 @@ export class OpenAIProvider implements LlmProvider {
         model: req.model,
         messages,
         max_completion_tokens: req.maxTokens,
+        ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
         ...(req.tools?.length
           ? {
               tools: req.tools.map((t) => ({

@@ -107,7 +107,7 @@ run("pnpm", ["--filter", "@autopilot/db", "migrate:deploy"]);
 
 step("3/7 Resetting the database (Autopilot tables + job queue only)");
 // Empties only this app's own tables in the local docker-compose database (see DECISIONS #24).
-const TABLES = ["GoalCheck", "Job", "Contract", "JobStep", "VerifierReport", "GateResult", "ApprovalDecision", "TrustRecord", "TrustEvent", "Lesson", "AuditEvent", "Setting", "MlModel", "MlPrediction", "NudgeDraft", "StandupBrief", "WorkItemEvent", "WorkItem", "Sprint", "PersonAlias"];
+const TABLES = ["GoalCheck", "Job", "Contract", "JobStep", "VerifierReport", "GateResult", "ApprovalDecision", "TrustRecord", "TrustEvent", "Lesson", "AuditEvent", "Setting", "MlModel", "MlPrediction", "NudgeDraft", "StandupBrief", "WorkItemEvent", "WorkItem", "Sprint", "PersonAlias", "KnowledgeDoc", "RegressionCheck"];
 const resetSql = `DROP SCHEMA IF EXISTS pgboss CASCADE; TRUNCATE ${TABLES.map((t) => `"${t}"`).join(", ")} CASCADE;`;
 run("docker", ["compose", "exec", "-T", "db", "psql", "-v", "ON_ERROR_STOP=1", "-U", "autopilot", "-d", dbName(), "-qc", resetSql], { quiet: true });
 rmSync(path.join(ROOT, ".autopilot"), { recursive: true, force: true });

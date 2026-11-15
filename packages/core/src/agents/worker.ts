@@ -3,8 +3,10 @@
  * Agent = Model (llm/gateway) + Harness (this loop, tools.ts, policy.ts, sandbox.ts, budgets).
  * A checkpoint is saved after every step; the loop resumes from it after a crash.
  */
+import type { ContextSection } from "../context/builder";
+import { estimateTokens } from "../llm/pricing";
 import type { CompleteRequest, LlmMessage, LlmResponse, ToolCall, ToolSpec } from "../llm/types";
-import { UNTRUSTED_RULE } from "../untrusted";
+import { promptStamp, renderPrompt } from "../prompts";
 import type { ToolOutcome } from "./tools";
 
 export interface Budget {
@@ -35,11 +37,14 @@ export interface StepRecord {
   outputSummary?: string;
   model?: string;
   provider?: string;
+  promptVersion?: string;
+  temperature?: number;
   tokensIn?: number;
   tokensOut?: number;
   costUsd?: number;
   durationMs?: number;
   checkpoint?: Checkpoint;
+  context?: ContextSection[];
 }
 
 export interface LoopDeps {
@@ -48,6 +53,8 @@ export interface LoopDeps {
   record: (step: StepRecord) => Promise<void>;
   /** Returns a reason to stop (e.g. kill switch) or null. Checked before every step. */
   shouldStop: () => Promise<string | null>;
+  /** Called when older tool results are compacted to stay under the context window. */
+  onCompaction?: (info: { summarised: number; tokensBefore: number; limit: number }) => Promise<void>;
   now?: () => number;
 }
 
@@ -60,6 +67,14 @@ export interface LoopConfig {
   initialMessages: LlmMessage[];
   resume?: Checkpoint;
   maxTokensPerCall?: number;
+  /** Version stamp of the system prompt (e.g. "worker@1"), recorded on every llm step. */
+  promptVersion?: string;
+  /** "What the model saw" breakdown, recorded on the first model step. */
+  contextBreakdown?: ContextSection[];
+  /** Compaction: summarise older tool results once the context passes modelWindow * compactAtFraction. */
+  modelWindow?: number;
+  compactAtFraction?: number;
+  compactKeepRecent?: number;
 }
 
 export type LoopStatus = "done" | "budget_exceeded" | "killed" | "error";
@@ -81,12 +96,38 @@ function summariseCall(c: ToolCall): string {
   return `${c.name}(${JSON.stringify(i)})`;
 }
 
+const COMPACTED_PREFIX = "[compacted tool result: ";
+
+/** Rough token estimate for the whole running transcript. */
+function contextTokens(messages: LlmMessage[]): number {
+  return messages.reduce((n, m) => n + estimateTokens(typeof m.content === "string" ? m.content : JSON.stringify(m)), 0);
+}
+
+/**
+ * Compaction: when the transcript passes modelWindow * fraction, replace the CONTENT of older tool
+ * results with a short summary (keeping all message roles/ids intact, so real providers stay valid).
+ * Returns how many were summarised.
+ */
+function compact(messages: LlmMessage[], keepRecent: number): number {
+  const cutoff = messages.length - keepRecent;
+  let summarised = 0;
+  for (let i = 0; i < cutoff; i++) {
+    const m = messages[i]!;
+    if (m.role === "tool" && m.content.length > 200 && !m.content.startsWith(COMPACTED_PREFIX)) {
+      m.content = `${COMPACTED_PREFIX}${m.content.replace(/\s+/g, " ").slice(0, 120)}…]`;
+      summarised++;
+    }
+  }
+  return summarised;
+}
+
 export async function runAgentLoop(cfg: LoopConfig, deps: LoopDeps): Promise<LoopResult> {
   const now = deps.now ?? Date.now;
   const messages: LlmMessage[] = cfg.resume ? [...cfg.resume.messages] : [...cfg.initialMessages];
   const usage: Usage = cfg.resume ? { ...cfg.resume.usage } : { steps: 0, tokensIn: 0, tokensOut: 0, costUsd: 0 };
   const startedAt = now() - (cfg.resume?.elapsedMs ?? 0);
   let degraded = false;
+  let contextRecorded = Boolean(cfg.resume);
   const b = cfg.budget;
 
   const overBudget = (): string | null => {
@@ -108,6 +149,19 @@ export async function runAgentLoop(cfg: LoopConfig, deps: LoopDeps): Promise<Loo
     if (over) {
       await deps.record({ kind: "note", status: "error", outputSummary: `Hard stop: ${over}` });
       return { status: "budget_exceeded", reason: over, explanation: "", messages, usage, degraded };
+    }
+
+    // CONTEXT MANAGEMENT: compact older tool results if the transcript is getting long.
+    if (cfg.modelWindow) {
+      const limit = cfg.modelWindow * (cfg.compactAtFraction ?? 0.6);
+      const before = contextTokens(messages);
+      if (before > limit) {
+        const summarised = compact(messages, cfg.compactKeepRecent ?? 6);
+        if (summarised > 0) {
+          await deps.record({ kind: "note", status: "ok", outputSummary: `Compaction: summarised ${summarised} older tool result(s) (context ${before} tok > ${Math.round(limit)} tok budget).` });
+          await deps.onCompaction?.({ summarised, tokensBefore: before, limit });
+        }
+      }
     }
 
     // PLAN: one model call
@@ -139,14 +193,18 @@ export async function runAgentLoop(cfg: LoopConfig, deps: LoopDeps): Promise<Loo
       status: "ok",
       model: res.model,
       provider: res.provider + (res.degraded ? " (degraded)" : ""),
+      promptVersion: cfg.promptVersion,
+      temperature: res.temperature,
       tokensIn: res.usage.inputTokens,
       tokensOut: res.usage.outputTokens,
       costUsd: res.costUsd,
       durationMs: now() - t0,
       inputSummary: res.toolCalls.map(summariseCall).join("\n") || "(final answer)",
       outputSummary: short(res.text, 1200),
+      ...(contextRecorded ? {} : { context: cfg.contextBreakdown }),
       ...(done ? { checkpoint: { messages, usage: { ...usage }, elapsedMs: now() - startedAt } } : {}),
     });
+    contextRecorded = true;
 
     if (done) return { status: "done", explanation: res.text.trim(), messages, usage, degraded };
 
@@ -176,19 +234,11 @@ export async function runAgentLoop(cfg: LoopConfig, deps: LoopDeps): Promise<Loo
   }
 }
 
+export const WORKER_PROMPT = () => promptStamp("worker");
+
 export function workerSystemPrompt(jobType: string, lessons: string[]): string {
-  return [
-    "You are the Autopilot worker: a careful software engineer fixing one problem in one repository, inside a sandbox.",
-    "",
-    "Constitution (enforced in code; violations are blocked and audited):",
-    "1. Never write to main. You work on an autopilot/* branch; the harness commits for you. You have no git access.",
-    "2. Only read or write paths inside the contract's allowedPaths. High-risk paths (.github/**, CI yml, AGENTS.md, CLAUDE.md, prompts/**, mcp*.json, infra/**, package.json scripts) are always off-limits.",
-    "3. Never add a dependency that does not exist in the package source.",
-    `4. ${UNTRUSTED_RULE}`,
-    "5. Stay within the step/token/USD/time budget. Make the smallest change that meets the done criteria.",
-    "",
-    "Report honestly: every claim in your final explanation must be backed by a tool result you actually saw (commands, exit codes).",
-    `Job type: ${jobType}.`,
-    lessons.length ? `\nLessons from previous runs (data, may be wrong):\n${lessons.map((l) => `- ${l}`).join("\n")}` : "",
-  ].join("\n");
+  return renderPrompt("worker", {
+    JOB_TYPE: jobType,
+    LESSONS: lessons.length ? `\nLessons from previous runs (data, may be wrong):\n${lessons.map((l) => `- ${l}`).join("\n")}` : "",
+  });
 }

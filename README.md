@@ -59,14 +59,16 @@ If port 5432 is already in use, set `AUTOPILOT_DB_PORT` and `DATABASE_URL` in `.
 
 | | Mock (default) | Real |
 |---|---|---|
-| `AUTOPILOT_LLM_PROVIDER` | `mock` | `anthropic` or `openai` |
-| Keys | none | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` |
+| `AUTOPILOT_LLM_PROVIDER` | `mock` | `anthropic`, `openai`, or `ollama` (local open-weight) |
+| Keys | none | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` (none for `ollama`) |
 | Worker / verifier | Scripted, deterministic models that drive the real loop, tools, policy, sandbox and git | `WORKER_MODEL` / `VERIFIER_MODEL` (or `OPENAI_*`) |
 | Cost figures | Estimated from the pinned model's prices (characters ÷ 4) | From provider-reported token usage |
 
 - **Model routing:** easy contracts use `WORKER_MODEL`; hard ones use `HARD_WORKER_MODEL`. The router throws a config error if the verifier model equals the worker model for a job.
 - **Retries:** transient errors are retried with backoff. Set `AUTOPILOT_ALLOW_MOCK_FALLBACK=true` to fall back to mock after repeated failures; such jobs are marked **degraded**.
 - **Pointing at another repo:** set `TARGET_REPO_PATH` to any local Node repo. Without `advisories.json` and `vendor/`, real mode uses the **OSV API** for advisories and the **npm registry** for the package-existence check. `pnpm cli seed` refuses to overwrite a directory that isn't a seeded demo repo.
+- **Open-weight / local option:** set `AUTOPILOT_LLM_PROVIDER=ollama` (no key) to run a local model through [Ollama](https://ollama.com) via its `/api/chat` endpoint (`OLLAMA_WORKER_MODEL`, `OLLAMA_VERIFIER_MODEL`). This shows the closed-vs-open hosting trade-off; the same router rule (verifier ≠ worker) applies.
+- **Temperature & non-determinism:** `AUTOPILOT_TEMPERATURE` (default 0) is passed to the provider and recorded on every trace. `pnpm eval` repeats each case `AUTOPILOT_EVAL_RUNS` times (mock 1, real 3) and reports a pass rate and a consistency score.
 
 ## GitHub mode (optional)
 
@@ -118,13 +120,28 @@ Team rules (AGENTS.md 8–13) are enforced in code:
 - least data.
 
 ```bash
-pnpm cli seed-sprint          # mock sprint with planted situations → Overview "Team health"
+pnpm cli seed-sprint          # mock sprint + 6 past sprints + planted situations → Overview "Team health"
+pnpm cli sprint-add-item      # add one mid-sprint item (scope change) and recompute the forecast
 pnpm cli demo-bad-brief       # scripted blaming/miscounting brief, blocked by gate + verifier
 pnpm cli ask "What's stuck and why?"
 pnpm mcp                      # read-only sprint MCP server on stdio
 ```
 
 Walkthrough: `docs/DEMO_SCRIPT.md` part 2.
+
+### Polished UI + a video-ready walkthrough
+
+- **Run morning routine** (Overview): one button runs check → find stuck → draft brief → verifier → gate → waiting, as a live pipeline.
+- **Sprint board**: kanban with Human/AI-agent badges, stuck reasons, and a Monte-Carlo **sprint forecast** (S3 goal). `+ Add mid-sprint item` shows the forecast drop live.
+- **Agents**: each AI teammate's trust, run stats and recent results; nudges are locked to "always needs a human".
+- **Presenter mode** for recording: open `http://localhost:3000/?presenter=1` — a 7-step guided tour (→/← to move, **R** to reset the demo). Narration: [`docs/VIDEO_SCRIPT.md`](docs/VIDEO_SCRIPT.md).
+
+Screens (light + dark, 1920×1080):
+
+| Overview | Sprint board |
+|---|---|
+| ![Overview](docs/screenshots/overview-light.png) | ![Sprint board](docs/screenshots/sprint-dark.png) |
+| ![Overview (dark)](docs/screenshots/overview-dark.png) | ![Agents (dark)](docs/screenshots/agents-dark.png) |
 
 ### Connecting a test Jira project (optional)
 

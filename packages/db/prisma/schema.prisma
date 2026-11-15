@@ -100,11 +100,14 @@ model JobStep {
   outputSummary String?  @db.Text
   model         String?
   provider      String?
+  promptVersion String? // versioned prompt stamp, e.g. "worker@1" (prompts/*.md)
+  temperature   Float? // sampling temperature used for this model call
   tokensIn      Int      @default(0)
   tokensOut     Int      @default(0)
   costUsd       Float    @default(0)
   durationMs    Int      @default(0)
   checkpoint    Json?
+  context       Json? // "what the model saw": per-section token breakdown (first model step)
   createdAt     DateTime @default(now())
 
   @@index([jobId, attempt, index])
@@ -243,6 +246,38 @@ model MlPrediction {
   @@index([createdAt])
 }
 
+/// "Every success becomes a check": the doneCriteria of an approved job, re-run on every goal run.
+/// A failing regression flags its goal (amber). One active check per goal (the latest approved fix).
+model RegressionCheck {
+  id            String    @id @default(cuid())
+  goalId        String    @unique
+  jobType       String
+  jobId         String
+  criteria      Json // doneCriteria descriptions captured at approval
+  active        Boolean   @default(true)
+  lastStatus    String    @default("pass") // pass | fail
+  lastCheckedAt DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([active])
+}
+
+/// Knowledge base (RAG): runbook passages indexed with Postgres full-text search (tsv column).
+/// Default offline search is FTS; pgvector embeddings are an optional extra when a provider key is set.
+model KnowledgeDoc {
+  id        String                   @id @default(cuid())
+  path      String // source path, e.g. docs/runbooks/dependency-upgrades.md
+  title     String
+  lineStart Int
+  lineEnd   Int
+  content   String                   @db.Text
+  tsv       Unsupported("tsvector")?
+  createdAt DateTime                 @default(now())
+
+  @@index([path])
+  @@index([tsv], type: Gin)
+}
+
 // ---------------------------------------------------------------------------
 // Scrum Mode: normalised sprint data (pseudonymised; real names only in PersonAlias)
 // ---------------------------------------------------------------------------
@@ -253,11 +288,12 @@ model Sprint {
   goal     String         @default("")
   start    DateTime
   end      DateTime
-  state    String // active | closed
-  provider String // mock | jira
-  syncedAt DateTime       @default(now())
-  items    WorkItem[]
-  briefs   StandupBrief[]
+  state      String // active | closed
+  provider   String // mock | jira
+  throughput Float? // story points completed (closed past sprints; used by the forecast)
+  syncedAt   DateTime       @default(now())
+  items      WorkItem[]
+  briefs     StandupBrief[]
 
   @@index([state])
 }

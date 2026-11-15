@@ -1,4 +1,5 @@
 /** The worker's task brief. Only harness-computed (trusted) fields go in <task>; anything verbatim from files/logs is wrapped as untrusted. */
+import type { LoadedSkill } from "../skills";
 import { wrapUntrusted } from "../untrusted";
 
 export interface TestRef {
@@ -33,6 +34,8 @@ export interface WorkerTask {
   };
   feedback?: string;
   lessons: string[];
+  /** Findings from the research sub-agent (G2 CI-log analysis), returned to the worker. */
+  research?: { summary: string; evidence: string }[];
 }
 
 export interface UntrustedAttachment {
@@ -40,10 +43,11 @@ export interface UntrustedAttachment {
   text: string;
 }
 
-export function renderTask(task: WorkerTask, attachments: UntrustedAttachment[]): string {
+export function renderTask(task: WorkerTask, attachments: UntrustedAttachment[], opts: { skill?: LoadedSkill | null } = {}): string {
   const parts = [
     "Here is your job. The <task> block is from the Autopilot harness (trusted).",
     `<task>\n${JSON.stringify(task, null, 2)}\n</task>`,
+    ...(opts.skill ? [`<skill name="${opts.skill.name}" version="${opts.skill.version}">\n${opts.skill.body}\n</skill>`] : []),
     ...attachments.map((a) => wrapUntrusted(a.source, a.text)),
     "Work step by step with the tools. When the done criteria are met (or you cannot make progress), stop calling tools and reply with a short explanation: what you changed, which commands you ran and their results, and any concerns.",
   ];

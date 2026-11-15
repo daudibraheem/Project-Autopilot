@@ -6,6 +6,7 @@
 import { getConfig, type LlmProviderName } from "../config";
 import { AnthropicProvider } from "./anthropic";
 import { MockProvider } from "./mock";
+import { OllamaProvider } from "./ollama";
 import { OpenAIProvider } from "./openai";
 import { estimateUsd } from "./pricing";
 import { type CompleteRequest, type LlmProvider, type LlmResponse, TransientLlmError } from "./types";
@@ -15,7 +16,7 @@ const providers = new Map<LlmProviderName, LlmProvider>();
 export function getProvider(name: LlmProviderName = getConfig().provider): LlmProvider {
   let p = providers.get(name);
   if (!p) {
-    p = name === "anthropic" ? new AnthropicProvider() : name === "openai" ? new OpenAIProvider() : new MockProvider();
+    p = name === "anthropic" ? new AnthropicProvider() : name === "openai" ? new OpenAIProvider() : name === "ollama" ? new OllamaProvider() : new MockProvider();
     providers.set(name, p);
   }
   return p;
@@ -44,6 +45,8 @@ export async function complete(req: CompleteRequest, opts: GatewayOptions = {}):
   const maxAttempts = opts.maxAttempts ?? 3;
   const baseDelay = opts.baseDelayMs ?? 800;
   const started = Date.now();
+  const temperature = req.temperature ?? cfg.temperature;
+  req = { ...req, temperature };
   await opts.beforeSend?.(req);
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -57,6 +60,7 @@ export async function complete(req: CompleteRequest, opts: GatewayOptions = {}):
         latencyMs: Date.now() - started,
         degraded: false,
         attempts: attempt,
+        temperature,
       };
     } catch (e) {
       lastErr = e;
@@ -75,6 +79,7 @@ export async function complete(req: CompleteRequest, opts: GatewayOptions = {}):
       latencyMs: Date.now() - started,
       degraded: true,
       attempts: maxAttempts,
+      temperature,
     };
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));

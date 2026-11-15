@@ -7,6 +7,7 @@ import { approveJob, rejectJob, requestChanges } from "@autopilot/core/approvals
 import { checkGoalsAndConduct } from "@autopilot/core/checks";
 import { createJob, startJobForGoal } from "@autopilot/core/conductor";
 import { ALL_GOAL_IDS, type GoalId } from "@autopilot/core/contract";
+import { indexKnowledgeFromRepo } from "@autopilot/core/knowledge";
 import { saveFlakyModel, trainFlakyModel } from "@autopilot/core/ml/flaky";
 import { runJob } from "@autopilot/core/pipeline";
 import { stopBoss } from "@autopilot/core/queue";
@@ -61,7 +62,8 @@ program
       console.log(await reintroduceG1(dir));
     } else {
       await seedDemoTarget(dir, { force: true });
-      console.log(`Seeded ${dir}`);
+      const n = await indexKnowledgeFromRepo(dir);
+      console.log(`Seeded ${dir} · indexed ${n} knowledge passage(s) from docs/runbooks/`);
     }
   });
 
@@ -173,16 +175,23 @@ program
 
 program
   .command("seed-sprint")
-  .description("Scrum Mode: seed one active sprint (~20 items) with the planted situations (mock provider)")
+  .description("Scrum Mode: seed one active sprint (~20 items) with the planted situations + 6 past sprints (mock provider)")
   .action(async () => {
-    const { clearSprintData, syncSprint } = await import("@autopilot/core/sprint/sync");
-    const { agentJobIdsForMock } = await import("@autopilot/core/sprint/provider");
-    const { MockSprintProvider } = await import("@autopilot/core/sprint/mock-provider");
-    await clearSprintData({ aliases: true });
-    const r = await syncSprint(new MockSprintProvider({ agentJobIds: await agentJobIdsForMock() }));
+    const { seedScrumDemo } = await import("@autopilot/core/sprint/demo");
+    const r = await seedScrumDemo();
     console.log(`Seeded "${r.sprint?.name}" (+ previous "${r.previous?.name}"): ${r.items} items, ${r.events} events, ${r.flagged.length} injection comment(s) flagged`);
     const { runGoalChecks, TEAM_GOAL_IDS } = await import("@autopilot/core/goals/index");
     for (const g of await runGoalChecks(TEAM_GOAL_IDS, "seed-sprint")) console.log(`${g.status.padEnd(5)} ${g.goalId.padEnd(20)} ${g.summary}`);
+  });
+
+program
+  .command("sprint-add-item")
+  .description("Scrum Mode: add one mid-sprint item (scope change) and recompute the forecast")
+  .option("--points <n>", "story points for the added item", "3")
+  .action(async (opts: { points?: string }) => {
+    const { addMidSprintItem } = await import("@autopilot/core/sprint/demo");
+    const r = (await addMidSprintItem(Number(opts.points) || 3)) as { key: string; title: string; points: number; forecastPct: number | null; droppedBy?: number };
+    console.log(`Added ${r.key} "${r.title}" (${r.points} pts). Forecast now ${r.forecastPct}%${r.droppedBy !== undefined ? ` (dropped ${r.droppedBy} points)` : ""}.`);
   });
 
 program

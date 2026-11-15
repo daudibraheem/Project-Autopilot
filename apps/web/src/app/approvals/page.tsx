@@ -147,7 +147,7 @@ export default function ApprovalsPage() {
       {!data ? (
         <Loading />
       ) : (
-        <div className="space-y-8">
+        <div data-presenter="approvals" className="space-y-8">
           {data.pending.length === 0 ? <Empty>Nothing is waiting for approval.</Empty> : data.pending.map((j) => <Review key={j.id} job={j} githubMode={sys?.githubMode} onDone={refresh} />)}
           {data.recent.length > 0 && (
             <section>

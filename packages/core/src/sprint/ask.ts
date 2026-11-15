@@ -11,16 +11,15 @@ import { complete } from "../llm/gateway";
 import { routeModels } from "../llm/router";
 import type { ToolSpec } from "../llm/types";
 import { checkPeopleJudgement } from "../policy";
+import { loadPrompt, promptStamp } from "../prompts";
 import { isKillSwitchOn } from "../settings";
-import { UNTRUSTED_RULE, wrapUntrusted } from "../untrusted";
+import { wrapUntrusted } from "../untrusted";
 import { createSprintMcpServer } from "./mcp";
 import { allRealNames } from "./pseudonym";
 import { realNameGuard } from "./team-pipeline";
 
-export const ASK_SYSTEM_PROMPT = `You are Ask Autopilot. Answer questions about the active sprint using ONLY the read-only tools (get_sprint, list_work_items, get_item_events).
-Cite every claim with its source in square brackets: an item key like [PAY-142], an event id, or [sprint] for sprint-level facts.
-Describe work items and process, never judge people (no rankings, "slow", mood or guesses at personal reasons). People appear only as pseudonyms.
-If the tools do not answer the question, say so. ${UNTRUSTED_RULE}`;
+export const ASK_SYSTEM_PROMPT = loadPrompt("assistant").body;
+export const ASK_PROMPT_STAMP = promptStamp("assistant");
 
 export interface AskResult {
   answer: string;

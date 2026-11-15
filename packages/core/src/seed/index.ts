@@ -78,7 +78,18 @@ export async function seedDemoTarget(dir: string, opts: SeedOptions = {}): Promi
 
   // Commit 1: the app, with the setup script still called scripts/init.js
   cpSync(path.join(TEMPLATES, "vendor"), path.join(dir, "vendor"), { recursive: true });
-  for (const f of ["src/invoice.js", "src/due.js", "src/cli.js", "test/invoice.test.js", "test/due.test.js", "scripts/lint.js", "README.md"]) {
+  for (const f of [
+    "src/invoice.js",
+    "src/due.js",
+    "src/cli.js",
+    "test/invoice.test.js",
+    "test/due.test.js",
+    "scripts/lint.js",
+    "README.md",
+    "docs/runbooks/dependency-upgrades.md",
+    "docs/runbooks/flaky-tests.md",
+    "docs/runbooks/docs-fixes.md",
+  ]) {
     write(dir, f, tpl(f));
   }
   write(dir, ".gitignore", tpl("gitignore"));

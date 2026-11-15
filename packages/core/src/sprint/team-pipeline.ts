@@ -7,7 +7,7 @@ import { prisma } from "@autopilot/db";
 import { audit } from "../audit";
 import { type Contract, GOAL_LABEL, type GoalId } from "../contract";
 import { runAgentLoop } from "../agents/worker";
-import { runTeamVerifier, type VerifierReport } from "../agents/verifier";
+import { runTeamVerifier, TEAM_VERIFIER_PROMPT_STAMP, type VerifierReport } from "../agents/verifier";
 import { runGoalChecks } from "../goals/index";
 import { addUsage, contractFromRow, finish, lessonFor, loadJob, StepRecorder, TERMINAL_STATUSES } from "../job-steps";
 import { complete } from "../llm/gateway";
@@ -165,7 +165,7 @@ export async function runTeamJob(jobId: string): Promise<void> {
           beforeSend: guard,
           onCall: async (r) => {
             await addUsage(jobId, r);
-            await rec.llm("verifier", r, `Review ${kind} against the facts. Worker reasoning withheld.`);
+            await rec.llm("verifier", r, `Review ${kind} against the facts. Worker reasoning withheld.`, TEAM_VERIFIER_PROMPT_STAMP);
           },
         },
       );

@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
+import { Avatar, Drawer } from "@/components/kit";
 import { BriefView, Counts } from "@/components/team";
 import { Button, cx, Empty, ErrorNote, JobStatus, Loading, Mono, PageHeader, Section } from "@/components/ui";
+import { restoreNames } from "@/lib/names";
 import { dateTime } from "@/lib/format";
 import type { Brief, BriefContent, People } from "@/lib/types";
 import { post, usePoll } from "@/lib/usePoll";
@@ -29,6 +31,7 @@ export default function StandupPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [slack, setSlack] = useState(false);
   return (
     <>
       <PageHeader
@@ -71,7 +74,7 @@ export default function StandupPage() {
         <Loading />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="min-w-0 space-y-6">
+          <div data-presenter="brief" className="min-w-0 space-y-6">
             <Section
               title={`Today's brief · ${data.today}`}
               aside={
@@ -97,6 +100,9 @@ export default function StandupPage() {
                       .
                     </p>
                   )}
+                  <div className="mb-3 flex justify-end">
+                    <Button onClick={() => setSlack(true)}>Preview in Slack</Button>
+                  </div>
                   <BriefView content={data.brief.content} people={data.people} />
                 </>
               ) : (
@@ -141,6 +147,35 @@ export default function StandupPage() {
           </div>
         </div>
       )}
+      <Drawer open={slack} onClose={() => setSlack(false)} title="Preview in Slack">
+        {data?.brief?.content?.sections ? (
+          <div className="rounded-lg border border-line bg-surface-2 p-4">
+            <div className="flex items-center gap-2">
+              <Avatar name="Autopilot" size={28} />
+              <div>
+                <span className="text-sm font-semibold">Autopilot</span> <span className="rounded bg-surface px-1 text-[10px] font-semibold uppercase text-muted">app</span>
+                <div className="text-[11px] text-muted">#standup · just now</div>
+              </div>
+            </div>
+            <div className="mt-3 space-y-3 text-sm">
+              <p className="font-semibold">:sunny: Standup — {data.today}</p>
+              {data.brief.content.sections.map((s) => (
+                <div key={s.title}>
+                  <p className="font-medium">{s.title}</p>
+                  <ul className="ml-4 list-disc space-y-0.5 text-[13px]">
+                    {s.sentences.map((x, i) => (
+                      <li key={i}>{restoreNames(x.text, data.people)}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <Empty>No brief to preview.</Empty>
+        )}
+        <p className="mt-4 rounded-lg bg-warn-bg px-3 py-2 text-xs text-warn">Preview only. Autopilot has no send capability — nothing is posted to Slack.</p>
+      </Drawer>
     </>
   );
 }

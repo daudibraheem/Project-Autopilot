@@ -16,7 +16,7 @@ export function findRepoRoot(start = process.cwd()): string {
 export const REPO_ROOT = findRepoRoot();
 dotenv.config({ path: path.join(REPO_ROOT, ".env"), quiet: true } as dotenv.DotenvConfigOptions);
 
-export type LlmProviderName = "mock" | "anthropic" | "openai";
+export type LlmProviderName = "mock" | "anthropic" | "openai" | "ollama";
 export type SandboxMode = "docker" | "local" | "auto";
 
 function env(name: string, fallback = ""): string {
@@ -31,6 +31,8 @@ export interface AutopilotConfig {
   verifierModel: string;
   openaiWorkerModel: string;
   openaiVerifierModel: string;
+  ollamaWorkerModel: string;
+  ollamaVerifierModel: string;
   allowMockFallback: boolean;
   targetRepoPath: string;
   workspacesDir: string;
@@ -39,6 +41,11 @@ export interface AutopilotConfig {
   githubRepo: string;
   sandbox: SandboxMode;
   sandboxImage: string;
+  contextWindow: number;
+  compactAtFraction: number;
+  mcpPoisonedTool: boolean;
+  temperature: number;
+  evalRuns: number;
 }
 
 /** Read config fresh each time so tests / CLI flags can change env between calls. */
@@ -46,12 +53,14 @@ export function getConfig(): AutopilotConfig {
   const provider = env("AUTOPILOT_LLM_PROVIDER", "mock") as LlmProviderName;
   const target = env("TARGET_REPO_PATH", "./demo_target");
   return {
-    provider: ["mock", "anthropic", "openai"].includes(provider) ? provider : "mock",
+    provider: ["mock", "anthropic", "openai", "ollama"].includes(provider) ? provider : "mock",
     workerModel: env("WORKER_MODEL", "claude-haiku-5-5"),
     hardWorkerModel: env("HARD_WORKER_MODEL", "claude-sonnet-5-5"),
     verifierModel: env("VERIFIER_MODEL", "claude-sonnet-5-5"),
     openaiWorkerModel: env("OPENAI_WORKER_MODEL", "gpt-5-mini"),
     openaiVerifierModel: env("OPENAI_VERIFIER_MODEL", "gpt-5"),
+    ollamaWorkerModel: env("OLLAMA_WORKER_MODEL", "llama3.1:8b"),
+    ollamaVerifierModel: env("OLLAMA_VERIFIER_MODEL", "qwen2.5:14b"),
     allowMockFallback: env("AUTOPILOT_ALLOW_MOCK_FALLBACK", "false") === "true",
     targetRepoPath: path.resolve(REPO_ROOT, target),
     workspacesDir: path.resolve(REPO_ROOT, env("AUTOPILOT_WORKSPACES_DIR", ".autopilot/workspaces")),
@@ -60,6 +69,12 @@ export function getConfig(): AutopilotConfig {
     githubRepo: env("GITHUB_REPO"),
     sandbox: (env("AUTOPILOT_SANDBOX", "auto") as SandboxMode) || "auto",
     sandboxImage: env("AUTOPILOT_SANDBOX_IMAGE", "node:22-slim"),
+    contextWindow: Number(env("AUTOPILOT_CONTEXT_WINDOW", "200000")) || 200_000,
+    compactAtFraction: Number(env("AUTOPILOT_COMPACT_AT", "0.6")) || 0.6,
+    mcpPoisonedTool: env("AUTOPILOT_MCP_POISONED_TOOL", "false") === "true",
+    temperature: Number(env("AUTOPILOT_TEMPERATURE", "0")) || 0,
+    // Eval repeats per case (non-determinism). Mock is deterministic → default 1; real providers → 3.
+    evalRuns: Number(env("AUTOPILOT_EVAL_RUNS", provider === "mock" ? "1" : "3")) || 1,
   };
 }
 

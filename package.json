@@ -17,6 +17,7 @@
     "lint:fix": "biome check --write .",
     "test": "vitest run",
     "mcp": "pnpm --filter @autopilot/mcp start",
+    "mcp-tools": "pnpm --filter @autopilot/mcp-tools start",
     "eval": "pnpm --filter @autopilot/cli exec tsx src/index.ts eval",
     "eval:promptfoo": "npx promptfoo@latest eval -c evals/promptfoo.yaml",
     "eval:promptfoo:team": "npx promptfoo@latest eval -c evals/promptfoo-team.yaml"

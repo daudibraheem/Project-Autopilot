@@ -1,8 +1,83 @@
 "use client";
 import { useState } from "react";
 import { clock, ms, usd } from "@/lib/format";
-import type { Evidence, JobDetail, Step } from "@/lib/types";
+import type { ContextSection, Evidence, JobDetail, RepoMap, Step } from "@/lib/types";
 import { Check, cx, Empty, Mono } from "./ui";
+
+/** "What the model saw": a stacked bar of per-section token counts in the assembled context. */
+const CONTEXT_COLORS: Record<string, string> = {
+  system_prompt: "bg-accent",
+  goal_contract: "bg-ok",
+  agents_md: "bg-warn",
+  skill: "bg-[color-mix(in_oklab,var(--accent),white_35%)]",
+  lessons: "bg-[color-mix(in_oklab,var(--ok),black_20%)]",
+  knowledge: "bg-[color-mix(in_oklab,var(--warn),black_25%)]",
+  tool_results: "bg-muted",
+  instructions: "bg-line",
+};
+
+export function ContextBar({ sections }: { sections: ContextSection[] }) {
+  const total = sections.reduce((n, s) => n + s.tokens, 0) || 1;
+  return (
+    <div className="space-y-3">
+      <div className="flex h-3 w-full overflow-hidden rounded-full">
+        {sections.map((s) => (
+          <div key={s.name} className={cx("h-full", CONTEXT_COLORS[s.name] ?? "bg-muted")} style={{ width: `${(s.tokens / total) * 100}%` }} title={`${s.label}: ${s.tokens} tok`} />
+        ))}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        {sections.map((s) => (
+          <li key={s.name} className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5">
+              <span className={cx("inline-block h-2.5 w-2.5 rounded-sm", CONTEXT_COLORS[s.name] ?? "bg-muted")} />
+              {s.label}
+            </span>
+            <span className="tabular-nums text-muted">{s.tokens} tok</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-muted">Total ~{total} tokens. One task per session: a fresh context each job; only lessons carry over.</p>
+    </div>
+  );
+}
+
+/** Codebase map (repo_map tool): files with exports/imports, and call sites of the mapped symbol. */
+export function RepoMapView({ map }: { map: RepoMap }) {
+  return (
+    <div className="space-y-4 text-sm">
+      {map.symbol && (
+        <div>
+          <p className="mb-1 font-medium">
+            Call sites of <Mono>{map.symbol}</Mono> <span className="text-muted">({map.callSites.length})</span>
+          </p>
+          {map.callSites.length === 0 ? (
+            <Empty>No call sites found.</Empty>
+          ) : (
+            <ul className="space-y-1">
+              {map.callSites.map((c) => (
+                <li key={`${c.path}:${c.line}`} className="font-mono text-xs">
+                  <span className="text-accent">
+                    {c.path}:{c.line}
+                  </span>{" "}
+                  <span className="text-muted">{c.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      <ul className="space-y-1.5">
+        {map.files.map((f) => (
+          <li key={f.path} className="text-xs">
+            <Mono>{f.path}</Mono>
+            {f.exports.length > 0 && <span className="ml-2 text-muted">exports: {f.exports.join(", ")}</span>}
+            {f.imports.length > 0 && <span className="ml-2 text-muted">imports: {f.imports.map((i) => i.module).join(", ")}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** Small custom unified-diff renderer (monospace, add/remove tinted). */
 export function Diff({ diff }: { diff: string | null }) {
@@ -41,6 +116,7 @@ export function Diff({ diff }: { diff: string | null }) {
 const PHASE_LABEL: Record<string, string> = {
   worker: "Worker",
   classifier: "Classifier",
+  subagent: "Research sub-agent",
   verifier: "Verifier",
   gate: "Gate",
   lesson: "Lesson",
@@ -62,7 +138,14 @@ export function Timeline({ steps }: { steps: Step[] }) {
       {steps.map((s) => {
         const isOpen = open[s.id] ?? (s.status === "denied" || (s.kind === "note" && s.phase === "gate"));
         return (
-          <li key={s.id} className={cx("rounded-lg border", s.status === "denied" ? "border-bad/40 bg-bad-bg/60" : s.status === "error" ? "border-warn/40" : "border-transparent hover:border-line")}>
+          <li
+            key={s.id}
+            className={cx(
+              "rounded-lg border",
+              s.phase === "subagent" && "ml-6 border-l-2 border-l-accent/40",
+              s.status === "denied" ? "border-bad/40 bg-bad-bg/60" : s.status === "error" ? "border-warn/40" : "border-transparent hover:border-line",
+            )}
+          >
             <button type="button" className="flex w-full items-start gap-3 px-3 py-2 text-left" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [s.id]: !isOpen })}>
               <span className="w-7 shrink-0 pt-0.5 text-right font-mono text-xs text-muted">{s.index}</span>
               <span
@@ -97,6 +180,8 @@ export function Timeline({ steps }: { steps: Step[] }) {
                 <p className="text-xs text-muted">
                   {clock(s.createdAt)}
                   {s.provider && ` · ${s.provider}`}
+                  {s.promptVersion && ` · prompt ${s.promptVersion}`}
+                  {s.kind === "llm" && s.temperature !== null && ` · temp ${s.temperature}`}
                   {s.hasCheckpoint && " · checkpoint saved"}
                 </p>
               </div>
@@ -226,6 +311,7 @@ const EV_LABEL: Record<string, string> = {
   classifier: "Classifier",
   rerun: "Re-run",
   git: "Git",
+  knowledge: "Knowledge base",
 };
 
 export function EvidenceList({ evidence }: { evidence: Evidence[] | null }) {

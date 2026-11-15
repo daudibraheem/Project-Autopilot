@@ -10,6 +10,7 @@ export interface SystemInfo {
   githubMode: boolean;
   killSwitch: boolean;
   pendingApprovals: number;
+  sprint: { name: string; start: string; end: string } | null;
 }
 
 export interface GoalView {
@@ -20,6 +21,7 @@ export interface GoalView {
   previousStatus: string | null;
   hoursBrokenWeek: number;
   history: { status: string; createdAt: string }[];
+  regressed: boolean;
 }
 
 export interface Overview extends SystemInfo {
@@ -60,12 +62,22 @@ export interface Step {
   outputSummary: string | null;
   model: string | null;
   provider: string | null;
+  promptVersion: string | null;
+  temperature: number | null;
   tokensIn: number;
   tokensOut: number;
   costUsd: number;
   durationMs: number;
   hasCheckpoint: boolean;
+  context: ContextSection[] | null;
   createdAt: string;
+}
+
+export interface ContextSection {
+  name: string;
+  label: string;
+  chars: number;
+  tokens: number;
 }
 
 export interface Evidence {
@@ -149,8 +161,31 @@ export interface JobDetail {
   approvals: { id: string; decision: string; reason: string | null; actor: string; createdAt: string; attempt: number }[];
   audit: AuditRow[];
   trust: { level: number; label: string; consecutivePasses: number; cap?: number };
-  analysis: { kind?: "brief" | "nudge"; briefId?: string | null } | null;
+  analysis: { kind?: "brief" | "nudge"; briefId?: string | null; repoMap?: RepoMap } | null;
   team: { brief: Brief | null; nudges: Nudge[]; people: People } | null;
+}
+
+export interface Forecast {
+  probability: number;
+  runs: number;
+  dailyRateMean: number;
+  remainingPoints: number;
+  completedPoints: number;
+  totalPoints: number;
+  daysRemaining: number;
+  finalP10: number;
+  finalP50: number;
+  finalP90: number;
+  burnup: { day: number; target: number; actual: number | null; p10: number; p50: number; p90: number }[];
+  pastThroughput: number[];
+  why: string;
+}
+
+export interface RepoMap {
+  symbol?: string;
+  files: { path: string; exports: string[]; imports: { module: string; symbols: string[]; resolved?: string; line: number }[] }[];
+  edges: { from: string; to: string }[];
+  callSites: { symbol: string; path: string; line: number; text: string }[];
 }
 
 export type People = Record<string, string>;

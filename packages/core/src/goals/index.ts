@@ -3,7 +3,7 @@ import { audit } from "../audit";
 import { getConfig } from "../config";
 import type { GoalId } from "../contract";
 import { GOAL_IDS, isTeamGoal, TEAM_GOAL_IDS } from "../contract";
-import { s1StandupBriefReady, s2NoStuckWork } from "./team";
+import { s1StandupBriefReady, s2NoStuckWork, s3SprintOnTrack } from "./team";
 import { g1NoCriticalVulns } from "./g1-no-critical-vulns";
 import { g2MainBuildGreen } from "./g2-main-build-green";
 import { g3SetupDocsWork } from "./g3-setup-docs-work";
@@ -21,6 +21,7 @@ export const GOALS: Record<GoalId, StandingGoal> = {
   "setup-docs-work": g3SetupDocsWork,
   "standup-brief-ready": s1StandupBriefReady,
   "no-stuck-work": s2NoStuckWork,
+  "sprint-on-track": s3SprintOnTrack,
 };
 
 export { TEAM_GOAL_IDS };
@@ -63,6 +64,9 @@ export async function runGoalChecks(goalIds: readonly GoalId[] = ALL_CHECKED_GOA
       details: { status: r.status, summary: r.summary, reason, durationMs: r.durationMs },
     });
   }
+  // Every success becomes a check: re-run saved regression checks against the statuses just computed.
+  const { runRegressionChecks } = await import("../regression");
+  await runRegressionChecks(new Map(results.map((r) => [r.goalId, r.status])));
   return results;
 }
 
@@ -74,10 +78,13 @@ export interface GoalOverview {
   previousStatus: string | null;
   hoursBrokenWeek: number;
   history: { status: string; createdAt: Date }[];
+  regressed: boolean;
 }
 
 export async function goalOverview(ids: readonly GoalId[] = GOAL_IDS): Promise<GoalOverview[]> {
   const since = weekWindowStart();
+  const { regressedGoals } = await import("../regression");
+  const regressed = await regressedGoals(ids);
   const out: GoalOverview[] = [];
   for (const id of ids) {
     const checks = await prisma.goalCheck.findMany({
@@ -87,7 +94,12 @@ export async function goalOverview(ids: readonly GoalId[] = GOAL_IDS): Promise<G
     });
     // include the last check before the window so a goal that was already red counts from window start
     const inWindow = checks.filter((c, i) => c.createdAt >= since || (checks[i + 1]?.createdAt ?? new Date(0)) >= since);
-    const latest = checks.at(-1) ?? null;
+    let latest = checks.at(-1) ?? null;
+    const isRegressed = regressed.has(id);
+    // A regression downgrades a green goal to amber (it never masks a red goal).
+    if (latest && isRegressed && latest.status === "green") {
+      latest = { ...latest, status: "amber", summary: `${latest.summary} · regression: a previously-approved fix no longer passes its goal check` };
+    }
     out.push({
       goalId: id,
       label: GOALS[id].label,
@@ -96,6 +108,7 @@ export async function goalOverview(ids: readonly GoalId[] = GOAL_IDS): Promise<G
       previousStatus: checks.at(-2)?.status ?? null,
       hoursBrokenWeek: hoursBroken(inWindow, since),
       history: checks.slice(-30).map((c) => ({ status: c.status, createdAt: c.createdAt })),
+      regressed: isRegressed,
     });
   }
   return out;

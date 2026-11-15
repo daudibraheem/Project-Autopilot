@@ -11,15 +11,20 @@ import { audit } from "./audit";
 import { getConfig, githubMode, isDemoTarget } from "./config";
 import { type Contract, GOAL_LABEL, type GoalId, isTeamJobType } from "./contract";
 import { renderTask, type UntrustedAttachment, type WorkerTask } from "./agents/task";
-import { annotateEvidence, type EvidenceItem, executeTool, TOOL_SPECS } from "./agents/tools";
-import { runVerifier, type VerifierReport } from "./agents/verifier";
-import { type Checkpoint, runAgentLoop, workerSystemPrompt } from "./agents/worker";
+import { annotateEvidence, type EvidenceItem } from "./agents/tools";
+import { connectWorkerTools } from "./agents/tools-mcp";
+import { runResearchSubAgent, SUBAGENT_PROMPT_STAMP } from "./agents/subagent";
+import { runVerifier, VERIFIER_PROMPT_STAMP, type VerifierReport } from "./agents/verifier";
+import { type Checkpoint, runAgentLoop, WORKER_PROMPT, workerSystemPrompt } from "./agents/worker";
 import { runGate } from "./gate";
 import { checkGoal } from "./goals/index";
 import { commitWorkspace, prepareWorkspace, pushBranch, recentCommits, showCommit, workspaceDiff, workspacePath } from "./git";
 import { complete } from "./llm/gateway";
 import { routeModels } from "./llm/router";
+import { buildWorkerContext } from "./context/builder";
+import { type KnowledgeHit, knowledgeCitationsIn, knowledgePathsExist, searchKnowledge } from "./knowledge";
 import { loadLessons, searchLessons } from "./lessons";
+import { skillForJobType, skillStamp } from "./skills";
 import { decide, failureRateFor, type FlakyDecision, loadFlakyModel, predictFlaky } from "./ml/flaky";
 import { FLAKY_SEEDS, parseTap, runAtRef, runInSandbox, TEST_COMMAND, testKey } from "./sandbox";
 import { parseCsv } from "./seed/ci-history";
@@ -45,6 +50,7 @@ interface PreparedTask {
   task: WorkerTask;
   attachments: UntrustedAttachment[];
   evidence: Omit<EvidenceItem, "step">[];
+  knowledge: KnowledgeHit[];
 }
 
 async function latestGoalEvidence(goalId: GoalId) {
@@ -168,6 +174,20 @@ async function buildTask(
           ? { quarantineReason: `quarantined by Autopilot job ${job.id}: flaky (p=${primary.p.toFixed(2)}, passed on re-run); fix tracked separately` }
           : {}),
       };
+
+      // Research sub-agent: read up to 40 past CI logs for this test in its OWN context; return ≤5 findings.
+      const ciLogs = rows
+        .filter((r) => r.test_file === primary!.f.file)
+        .slice(-40)
+        .map((r) => `run ${r.run_id} @ ${r.timestamp} commit ${r.commit} failed=${r.failed} rerun_passed=${r.rerun_passed} files_changed=${r.files_changed} test_touched=${r.test_file_touched} label=${r.label || "?"}`);
+      if (ciLogs.length) {
+        const research = await runResearchSubAgent({ test: { file: primary.f.file, name: primary.f.name }, logs: ciLogs, model: route.workerModel }, async (r) => {
+          await addUsage(job.id, r);
+          await rec.llm("subagent", r, `Research sub-agent: read ${ciLogs.length} past CI run(s) for ${primary!.f.file} in its own, separate context`, SUBAGENT_PROMPT_STAMP);
+        });
+        task.research = research.findings;
+        await rec.note("subagent", `Research sub-agent returned ${research.findings.length} finding(s): ${research.findings.map((f) => f.summary).join(" | ")}`);
+      }
       if (decision === "real_bug") {
         // Find the cause commit: newest commit whose parent still passes the failing test (bounded bisect, max 4 runs).
         const commits = (await recentCommits(cfg.targetRepoPath, "main", 6)).filter((c) => c.files.some((f) => !f.startsWith("test/")));
@@ -200,7 +220,9 @@ async function buildTask(
       text: JSON.stringify({ summary: goal.summary, failedStep: idx, failedCommand: failed?.command ?? null, output: failed?.output ?? "" }, null, 2),
     });
   }
-  return { task, attachments, evidence };
+  // Pre-retrieve one relevant knowledge passage for the assembled context (RAG in the context, not only as a tool).
+  const knowledge = await searchKnowledge(`${job.jobType.replace(/-/g, " ")} ${goal.summary}`, 1);
+  return { task, attachments, evidence, knowledge };
 }
 
 // ---------------- main entry ----------------
@@ -266,6 +288,21 @@ export async function runJob(jobId: string): Promise<void> {
       }
 
       const prepared = await buildTask(job, contract, ws, baseline, rec, route);
+      const skill = skillForJobType(job.jobType);
+      if (skill) await rec.note("system", `Loaded skill: ${skillStamp(skill)} (matches job type ${job.jobType})`);
+      const workerSystem = workerSystemPrompt(job.jobType, []); // lessons move into the assembled context
+      const built = buildWorkerContext({
+        system: workerSystem,
+        task: prepared.task,
+        attachments: prepared.attachments,
+        skill,
+        lessons: prepared.task.lessons,
+        knowledge: prepared.knowledge,
+      });
+      await rec.note(
+        "system",
+        `Context assembled (one task per session; fresh context, lessons carried over). What the model saw: ${built.sections.map((s) => `${s.label} ${s.tokens} tok`).join(" · ")} · total ~${built.totalTokens} tok`,
+      );
       const evidence: EvidenceItem[] = [];
       let step = 0;
       const addEvidence = (e: Omit<EvidenceItem, "step">) => evidence.push({ ...e, step: ++step });
@@ -276,15 +313,26 @@ export async function runJob(jobId: string): Promise<void> {
       }
       await prisma.job.update({ where: { id: jobId }, data: { analysis: { task: prepared.task } as object } });
 
+      // Worker tools are provided over MCP (in-process client ↔ server). A tool-poisoning self-scan
+      // runs at connect; policy.ts still checks every call inside executeTool (server-side).
+      const toolCtx = { jobId, ws, contract, baselineFailures: new Set(baseline), demoMode, searchLessons: (q: string) => searchLessons(q), searchKnowledge: (q: string) => searchKnowledge(q), addEvidence };
+      const mcp = await connectWorkerTools(toolCtx, { includePoisoned: cfg.mcpPoisonedTool, jobId });
+      for (const r of mcp.refused) await rec.note("system", `MCP tool-poisoning self-scan REFUSED tool "${r.tool}": ${r.reasons.join("; ")}. It was not offered to the model.`, "error");
+      await rec.note("system", `Worker tools served over MCP (in-process client): ${mcp.tools.map((t) => t.name).join(", ")}${mcp.refused.length ? ` · refused ${mcp.refused.length}` : ""}`);
+
       const result = await runAgentLoop(
         {
-          system: workerSystemPrompt(job.jobType, prepared.task.lessons),
-          tools: TOOL_SPECS,
+          system: workerSystem,
+          tools: mcp.tools,
           model: route.workerModel,
           script: badWorker ? "bad-worker" : undefined,
           budget: contract,
-          initialMessages: [{ role: "user", content: renderTask(prepared.task, prepared.attachments) }],
+          initialMessages: [{ role: "user", content: built.userMessage }],
           resume: canResume ? (resumeStep!.checkpoint as unknown as Checkpoint) : undefined,
+          promptVersion: WORKER_PROMPT(),
+          contextBreakdown: built.sections,
+          modelWindow: cfg.contextWindow,
+          compactAtFraction: cfg.compactAtFraction,
         },
         {
           llm: async (req) => {
@@ -293,17 +341,21 @@ export async function runJob(jobId: string): Promise<void> {
             return r;
           },
           exec: async (call) => {
-            const out = await executeTool(
-              { jobId, ws, contract, baselineFailures: new Set(baseline), demoMode, searchLessons: (q) => searchLessons(q), addEvidence },
-              call,
-            );
-            await prisma.job.update({ where: { id: jobId }, data: { evidence: evidence as unknown as object } });
+            const out = await mcp.exec(call);
+            await prisma.job.update({
+              where: { id: jobId },
+              data: { evidence: evidence as unknown as object, ...(out.repoMap ? { analysis: { task: prepared.task, repoMap: out.repoMap } as object } : {}) },
+            });
             return out;
           },
           record: (s) => rec.record("worker", s),
           shouldStop: async () => ((await isKillSwitchOn()) ? "Kill switch is on" : null),
+          onCompaction: async (info) => {
+            await audit({ actor: "worker", action: "context.compacted", target: jobId, jobId, details: info });
+          },
         },
       );
+      await mcp.close();
       await prisma.job.update({ where: { id: jobId }, data: { stepsUsed: result.usage.steps, evidence: annotateEvidence(evidence) as unknown as object, ...(result.degraded ? { degraded: true } : {}) } });
 
       if (result.status !== "done") {
@@ -352,11 +404,26 @@ export async function runJob(jobId: string): Promise<void> {
         {
           onCall: async (r) => {
             await addUsage(jobId, r);
-            await rec.llm("verifier", r, `Review diff (${changedFiles.length} files) + ${evidence.length} evidence items. Worker reasoning withheld.`);
+            await rec.llm("verifier", r, `Review diff (${changedFiles.length} files) + ${evidence.length} evidence items. Worker reasoning withheld.`, VERIFIER_PROMPT_STAMP);
           },
         },
       );
       report = v.report;
+      // RAG: the verifier stage confirms every runbook the worker cited actually exists in the index.
+      const cited = knowledgeCitationsIn(fresh.explanation ?? "");
+      if (cited.length) {
+        const exist = await knowledgePathsExist(cited);
+        const missing = cited.filter((p) => !exist[p]);
+        report.checks.push({
+          name: "knowledge_citations_exist",
+          passed: missing.length === 0,
+          reason: missing.length ? `Cited knowledge paths not in the index: ${missing.join(", ")}` : `All ${cited.length} cited runbook path(s) exist in the knowledge base.`,
+        });
+        if (missing.length) {
+          report.verdict = "fail";
+          report.concerns.push(`Worker cited knowledge sources that do not exist: ${missing.join(", ")}.`);
+        }
+      }
       await prisma.verifierReport.create({
         data: { jobId, attempt: fresh.attempt, model: route.verifierModel, provider: v.responses.at(-1)?.provider ?? route.provider, verdict: report.verdict, checks: report.checks, concerns: report.concerns },
       });

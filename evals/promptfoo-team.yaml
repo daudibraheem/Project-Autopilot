@@ -12,5 +12,6 @@ providers:
     label: team verifier (Claude Sonnet 5.5)
     config:
       max_tokens: 2000
+      temperature: 0
 
 tests: file://generated/team-verifier-tests.json

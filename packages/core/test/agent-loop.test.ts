@@ -18,6 +18,7 @@ function endlessModel(costPerCall = 0.001, tokens = 100) {
       latencyMs: 1,
       degraded: false,
       attempts: 1,
+      temperature: 0,
     };
   };
 }

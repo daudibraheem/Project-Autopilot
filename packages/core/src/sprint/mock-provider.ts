@@ -165,8 +165,8 @@ export class MockSprintProvider implements SprintProvider {
       id: "mock-sprint-14",
       name: "Payments Sprint 14",
       goal: "Ship partial refunds end to end and keep checkout stable.",
-      start: new Date(this.now - 6 * D),
-      end: new Date(this.now + 8 * D),
+      start: new Date(this.now - 4 * D),
+      end: new Date(this.now + 10 * D),
       state: "active",
     };
     this.previous = {

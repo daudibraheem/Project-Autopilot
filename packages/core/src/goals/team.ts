@@ -2,6 +2,7 @@
 import { prisma } from "@autopilot/db";
 import { REASON_LABEL } from "../sprint/stuck";
 import { currentStuck, localDate, sprintSettings, standupAt, activeSprint } from "../sprint/data";
+import { forecastSprint, forecastStatus } from "../sprint/forecast";
 import type { StandingGoal } from "./types";
 
 export const s1StandupBriefReady: StandingGoal = {
@@ -53,6 +54,34 @@ export const s2NoStuckWork: StandingGoal = {
       status: "red",
       summary: `${stuck.length} stuck: ${stuck.map((s) => `${s.key} (${s.reasons.map((r) => REASON_LABEL[r.code].toLowerCase()).join(", ")})`).join("; ")}`,
       evidence,
+    };
+  },
+};
+
+export const s3SprintOnTrack: StandingGoal = {
+  id: "sprint-on-track",
+  label: "S3 · Sprint forecast",
+  description: "Monte Carlo forecast of finishing the sprint's work. Green ≥ 70%, amber 40–70%, red below 40%. Check-only: never spawns a job.",
+  async check() {
+    const { sprint, forecast } = await forecastSprint();
+    if (!sprint || !forecast) return { goalId: "sprint-on-track", status: "amber", summary: "No active sprint synced", evidence: {} };
+    const pct = Math.round(forecast.probability * 100);
+    return {
+      goalId: "sprint-on-track",
+      status: forecastStatus(forecast.probability),
+      summary: `${pct}% chance of hitting the sprint goal (${forecast.remainingPoints} of ${forecast.totalPoints} pts left, ${forecast.daysRemaining} day(s) to go)`,
+      evidence: {
+        probability: forecast.probability,
+        remainingPoints: forecast.remainingPoints,
+        completedPoints: forecast.completedPoints,
+        totalPoints: forecast.totalPoints,
+        daysRemaining: forecast.daysRemaining,
+        finalP10: forecast.finalP10,
+        finalP50: forecast.finalP50,
+        finalP90: forecast.finalP90,
+        pastThroughput: forecast.pastThroughput,
+        why: forecast.why,
+      },
     };
   },
 };
